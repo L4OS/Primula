@@ -1,9 +1,7 @@
 #include <stdio.h>
-#include <tchar.h>
 #include <string.h>
 #include <ctype.h>
 #include <malloc.h>
-#include <io.h>
 
 // Local project files
 #include "../include/lexem.h"
