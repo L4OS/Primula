@@ -59,6 +59,7 @@ void lexem_to_string(lexem_item_t * l, char * txt_buff, int buff_size)
 	case lt_add_and_set:	snprintf(txt_buff, buff_size, "+=");					break;
 	case lt_sub_and_set:	snprintf(txt_buff, buff_size, "-=");					break;
 	case lt_div_and_set:	snprintf(txt_buff, buff_size, "/=");					break;
+	case lt_rest_and_set:	snprintf(txt_buff, buff_size, "%=");					break;
 	case lt_namescope:		snprintf(txt_buff, buff_size, "::");					break;
 	case lt_return:			snprintf(txt_buff, buff_size, "return ");				break;
 	case lt_do:				snprintf(txt_buff, buff_size, "do");					break;
@@ -115,6 +116,7 @@ void lexem_to_string(lexem_item_t * l, char * txt_buff, int buff_size)
 	case lt_union:		strncpy(txt_buff, "union ", buff_size); break;
 	case lt_struct:		strncpy(txt_buff, "struct ", buff_size); break;
 	case lt_typedef:	strncpy(txt_buff, "typedef ", buff_size); break;
+	case lt_register:	strncpy(txt_buff, "register ", buff_size); break;
 
 	default:
 		throw "Type description failed";
@@ -133,6 +135,7 @@ int restore_code(FILE * inp, FILE * of)
 	int					tabs = 0;
 	bool				crlf = false;
 	int					prev_line = 1;
+	int					line_number = 0;
 	while (true)
 	{
 		eof = fgets(buffer, sizeof(buffer) - 1, inp);
@@ -144,7 +147,6 @@ int restore_code(FILE * inp, FILE * of)
 		}
 		else if (buffer[0] == '@')
 		{
-			int line_number;
 			sscanf(&buffer[1], "%u", &line_number);
 			// for (int i = prev_line; i < line_number; i++) 
 				fprintf(of, "\n");
@@ -153,9 +155,6 @@ int restore_code(FILE * inp, FILE * of)
 		}
 		else
 		{
-#if false
-			status = sscanf(buffer, "%d %s", &id, arg);
-#else
 			status = sscanf(buffer, "%d", &id);
 			char * value = strchr(buffer, ' ');
 			if(value)
@@ -170,10 +169,18 @@ int restore_code(FILE * inp, FILE * of)
 					*term = '\0';
 				strncpy(arg, value, sizeof(arg));
 			}
-#endif
+
 			l.type = id;
 			l.lexem = arg;
-			lexem_to_string(&l, buffer, sizeof(buffer));
+
+			try 
+			{
+				lexem_to_string(&l, buffer, sizeof(buffer));
+			}
+			catch (const char * err)
+			{
+				fprintf(stderr, "Line %d: Exception: %s\n", line_number, err);
+			}
 
 			if (id == lt_closeblock)
 				tabs--;
