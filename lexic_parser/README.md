@@ -8,7 +8,7 @@ Example of use:
 ```
 If no errors were detected then programm will create new file "helloworld.c.lexem". 
 
-Example of generated "test.c.lexem" is shown below:
+Example of generated "helloworld.c.lexem" is shown below:
 
 ```
 // $ helloworld.c
@@ -47,7 +47,7 @@ Each string is a single lexem. Look into ../include/lexem.h to see lexem definit
 Also lexical parser can restore source file from Primula Raw Lexem format.
 Example of source code restore:
 ```
-	lexical_parse -REVERSE helloworld.c.lexem
+	./lexical_parse -REVERSE helloworld.c.lexem
 ```
 
 This command will restore the source into file "helloworld.c.lexem.cc":
@@ -61,11 +61,12 @@ int main ()
 ```
 
 The Primula Raw Lexeme format file is a source for Primula Syntax parser. 
+
 Lines stated with the at symbol define source line number.
 
 Each lexeme defined as a decimal number.
 
-Lexeme number 1 conveys text which can be user defined name, such as variable or funtiona names, name of user defined types and so on.
+Lexeme number 1 conveys text which can be user defined name, such as variable or function name, name of user defined type and so on.
 
 Lexem number 5 conveys string constants.
 
