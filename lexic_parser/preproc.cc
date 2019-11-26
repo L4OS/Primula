@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <io.h>
 #include <stdlib.h>
+#if defined(_MSC_VER)
+# include <io.h>
+#else
+# include <unistd.h>
+# define _access access
+# define _snprintf snprintf
+#endif
 
 #include "../include/defdef.h"
 
