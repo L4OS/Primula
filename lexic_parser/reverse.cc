@@ -18,7 +18,7 @@ void lexem_to_string(lexem_item_t * l, char * txt_buff, int buff_size)
 	case lt_word:			snprintf(txt_buff, buff_size, "%s ", l->lexem);	break;
 	case lt_integer:		
 	case lt_floatnumber:	snprintf(txt_buff, buff_size, " %s", l->lexem);	break;
-	case lt_string:			snprintf(txt_buff, buff_size, " \"%s\"", l->lexem);	break;
+	case lt_string:			snprintf(txt_buff, buff_size, " \"%s\" ", l->lexem);	break;
 	case lt_openbraket:		txt_buff[0] = '(';						break;
 	case lt_comma:			txt_buff[0] = ',';						break;
 	case lt_closebraket:	txt_buff[0] = ')';						break;
