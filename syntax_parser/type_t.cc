@@ -18,6 +18,7 @@ compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mod
 	while (rtype->prop == type_t::constant_type)
 	{
 		rconst = true;
+
 		rtype = ((const_t*)rtype)->parent_type;
 	}
 
@@ -65,6 +66,6 @@ compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mod
 			return cast_type;
 		return no_cast;
 	}
-	throw "TODO Finish type comparasiion";
+	throw "TODO Finish type comparasion";
 }
 
