@@ -1,12 +1,14 @@
 #include "../include/lexem.h"
 
-typedef enum {
+typedef enum 
+{
 	v_c,
 	v_cp,
 	v_cpp
 } version_t;
 
-typedef struct	{
+typedef struct	
+{
 	char const 		*	name;
 	lexem_type_t		identify;
 	version_t			plusplus;
@@ -89,52 +91,24 @@ const reserved_word_t	operators[] = {
 // Hash of all reserved word
 reserved_word_t	const	*	words_hash[HASH_SIZE];
 
-unsigned int get_hash_value( const char * w) {
+unsigned int get_hash_value( const char * w)
+{
 	unsigned int	seed = 339;
 	unsigned int	hash = 0;
 
-	for( int i=0; w[i]; i++ ) {
+	for( int i=0; w[i]; i++ ) 
+	{
 		unsigned int c = w[i] - 'a';
 		hash = hash * seed + c + i;
 	}
 	return hash % HASH_SIZE;
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// Returns pointer to reserved word descriptor by its lexeme
-static reserved_word_t const * find_reserved_word( int id ) {
-	reserved_word_t const * result = 0;
-	if( id >= 1000 && id <= 1062) result = &operators[id - 1000];
-	return result;
-}
-
-void create_hash(void) {
-	int collision = 0;
-	unsigned int	hash;
-	for (int i = 0; i < sizeof(words_hash) / sizeof(words_hash[0]); i++)
-		words_hash[i] = 0;
-	for(int i=0; i<WORDS_COUNT; i++) {
-		char const *	w = operators[i].name;
-		hash = get_hash_value( w );
-		if( ! words_hash[hash] ) {
-			words_hash[hash] = &operators[i];
-			collision++;
-		} else for( int j=0; j<10; j++ ) {
-			hash++;
-			hash %= HASH_SIZE;
-			if( words_hash[hash] ) 	{	collision++; continue; }
-			if(j >= 10) throw "No hash space available";
-			words_hash[hash] = &operators[i];
-			break;
-		}
-	}
-}
-
 // Avoid external includes
 static int strcmp(const char *w1, const char *w2)
 {
 	int res;
-	while(true)
+	while (true)
 	{
 		register int result = *w1 - *w2;
 		if (result || *w1 == 0)
@@ -144,13 +118,27 @@ static int strcmp(const char *w1, const char *w2)
 	}
 }
 
-reserved_word_t const * find_reserved_word( char const * w ) {
+/////////////////////////////////////////////////////////////////////////////
+// Returns pointer to reserved word descriptor by its lexeme
+static reserved_word_t const * find_reserved_word( int id ) 
+{
+	reserved_word_t const * result = 0;
+	if( id >= 1000 && id <= 1062) 
+		result = &operators[id - 1000];
+	return result;
+}
+
+reserved_word_t const * find_reserved_word(char const * w) 
+{
 	reserved_word_t const * result = 0;
 	unsigned int	hash;
-	hash = get_hash_value( w );
-	for(int i=0; i<10; i++) {
-		if( words_hash[hash] == 0 ) break;
-		if( strcmp(words_hash[hash]->name, w) == 0) {
+	hash = get_hash_value(w);
+	for (int i = 0; i < 10; i++)
+	{
+		if (words_hash[hash] == 0)
+			break;
+		if (strcmp(words_hash[hash]->name, w) == 0)
+		{
 			result = words_hash[hash];
 			break;
 		}
@@ -160,16 +148,50 @@ reserved_word_t const * find_reserved_word( char const * w ) {
 	return result;
 }
 
+void create_hash(void) 
+{
+	int collision = 0;
+	unsigned int	hash;
+	for (int i = 0; i < sizeof(words_hash) / sizeof(words_hash[0]); i++)
+		words_hash[i] = 0;
+	for(int i=0; i<WORDS_COUNT; i++) 
+	{
+		char const *	w = operators[i].name;
+		hash = get_hash_value( w );
+		if( ! words_hash[hash] ) 
+		{
+			words_hash[hash] = &operators[i];
+			collision++;
+		} 
+		else for( int j=0; j<10; j++ ) 
+		{
+			hash++;
+			hash %= HASH_SIZE;
+			if( words_hash[hash] ) 	
+			{	
+				collision++; 
+				continue; 
+			}
+			if(j >= 10) 
+				throw "No hash space available";
+			words_hash[hash] = &operators[i];
+			break;
+		}
+	}
+}
+
 lexem_type_t translate_lexem( char const * w )
 {
 	reserved_word_t const * prw = find_reserved_word(w);
-	if( ! prw ) return lt_empty;
+	if( ! prw ) 
+		return lt_empty;
 	return prw->identify;
 }
 
 char const * get_word_by_lexem( int identify )
 {
 	reserved_word_t const * prw = find_reserved_word( identify );
-	if( ! prw ) return 0;
+	if( ! prw ) 
+		return 0;
 	return prw->name;
 }
