@@ -10,7 +10,7 @@
 # define _snprintf snprintf
 #endif
 
-#include "../include/defdef.h"
+#include "defdef.h"
 
 extern int parse_input( flow_control_t	*	flow );
 extern int substitute_def_expression(def_pair_t * def, char * str);

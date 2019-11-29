@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../include/lexem.h"
-#include "../include/defdef.h"
+#include "defdef.h"
 
 extern int parse_input( flow_control_t	*	flow );
 extern void create_hash(void);

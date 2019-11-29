@@ -5,7 +5,7 @@
 
 // Local project files
 #include "../include/lexem.h"
-#include "../include/defdef.h"
+#include "defdef.h"
 
 #pragma region Config area
 int		autoname = 0;	// Generate automatical name for unnamed structures. Not need at all

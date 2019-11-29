@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#include "../include/defdef.h"
+#include "defdef.h"
 
 static def_pair_t	defintions[2048];
 static int			def_count = 0;

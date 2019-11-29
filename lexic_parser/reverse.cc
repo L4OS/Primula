@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "../include/lexem.h"
-#include "../include/defdef.h"
+#include "defdef.h"
 
 lexem_item_t		*	lexem_head = 0;
 lexem_item_t		*	lexem_tail = 0;
