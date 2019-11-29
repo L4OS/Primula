@@ -75,28 +75,6 @@ public:
 		return index == eof;
 	}
 
-	SourcePtr(SourcePtr source, lexem_type_t delimiter, bool mandatory)
-	{
-		index = source.index;
-		if (source == true)
-		{
-			for (eof = index; eof != source.eof; eof++)
-				if (eof->lexem == delimiter)
-				{
-					lexem = index->lexem;
-					line_number = index->line_number;
-					sequence = index->sequence;
-					statements = index->statements;
-					if (index->value)
-						value = index->value;
-				}
-			if (!mandatory &&  eof == source.eof)
-				eof = index;
-		}
-		else
-			eof = index;
-	}
-
 	SourcePtr(Code::lexem_list_t * items)
 	{
 		index = items->begin();

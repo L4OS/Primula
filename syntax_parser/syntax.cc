@@ -75,7 +75,7 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 #include <string>
 
 #include "namespace.h"
-#include "codegen/restore_source_t.h"
+#include "../codegen/restore_source_t.h"
 
 restore_source_t			global_space;
 

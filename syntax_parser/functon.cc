@@ -203,6 +203,11 @@ void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, So
 				type = new address_t(type);
 				continue;
 			}
+			if (node.lexem == lt_const)
+			{
+				type = new const_t(type);
+				continue;
+			}
 			if (node.lexem == lt_comma)
 			{
 				argument = new farg_t(this->space, type, ""); // space->CreateVariable(type, name); // Create argument here
@@ -355,14 +360,15 @@ void function_t::FindBestFunctionOverload(call_t * call)
 				// We found "..."
 				break;
 			}
-			if (CompareTypes(proto, type, true) != no_cast)
+			bool zero_rval = false; 
+			if (CompareTypes(proto, type, true, zero_rval) != no_cast)
 			{
 				arg_proto++;
 				continue;
 			}
 			else
 			{
-				printf("types_not_match\n");
+//				printf("types_not_match, but we still looking for function\n");
 				call->code = nullptr;
 				break;
 			}

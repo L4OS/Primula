@@ -36,31 +36,44 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 		}
 		else
 		{
-			SourcePtr term_ptr(source, lt_semicolon, true);
-			statement = new return_t;
-			statement->return_value = ParseExpression(term_ptr);
-			if (statement->return_value == nullptr)
+			expression_t * expression = ParseExpression(source);
+			if (expression == nullptr)
 			{
-				delete statement;
+				CreateError(-7777000, "Internal error on parsing expression", source.line_number);
 				return nullptr;
 			}
-			source.index = ++term_ptr.index;
-			if (source != false)
-				source.lexem = source.index->lexem;
-			//ExpressionParser(SourcePtr(source, lt_semicolon, true));
+			if (source == false)
+			{
+				CreateError(-7777000, "semicolon expected after return expression", source.line_number);
+				return nullptr;
+			}
 
-			compare_t compare = CompareTypes(owner_function->function->type, statement->return_value->type, false);
+			source.lexem = source.index->lexem;
+
+			bool zero_rval = false;
+			if (expression->is_constant && expression->type->signed_type)
+			{
+				expression_node_t * en = expression->root;
+				if (en->is_constant && en->lexem == lt_integer)
+				{
+					constant_node_t * con = en->constant;
+					zero_rval = con->integer_value == 0;
+				}
+			}
+			compare_t compare = CompareTypes(owner_function->function->type, expression->type, false, zero_rval);
 			switch (compare)
 			{
 			case same_types:	// types exactly match
 				break;
-			case cast_type:	// type can be casted to l-value type
+			case cast_type:	// r-value type can be casted to l-value type
 				printf("Add casting to an expression\n");
 				break;
-			case no_cast:		// type cannpt be casted to l-value
+			case no_cast:		// r-value type cannot be casted to l-value type
 				CreateError(-7777000, "function return argument type does not match to function type", source.line_number);
 				source.Finish();
 			}
+			statement = new return_t;
+			statement->return_value = expression;
 		}
 	}
 	return statement;
@@ -309,7 +322,7 @@ statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source)
 	}
 
 	operator_FOR * result = new operator_FOR;
-	result->body = CreateSpace(codeblock_space, std::string(""));
+	result->body = CreateSpace(continue_space, std::string(""));
 
 	//	__debugbreak();
 	SourcePtr ptr(source.sequence);
@@ -342,7 +355,6 @@ statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source)
 	//
 	return result;
 }
-
 
 statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 {
@@ -397,12 +409,12 @@ statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 	return result;
 }
 
-namespace_t * namespace_t::findBreakableSpace()
+namespace_t * namespace_t::findBreakableSpace(bool continues)
 {
 	namespace_t *	space = this;
 	while (space)
 	{
-		if (space->type == continue_space || space->type == switch_space)
+		if (space->type == continue_space || (space->type == switch_space) && !continues)
 			break;
 		space = space->parent;
 	}
@@ -429,7 +441,7 @@ statement_t * namespace_t::CheckOperator_BREAK(SourcePtr &source)
 		return nullptr;
 	}
 
-	namespace_t	*	breakeable = findBreakableSpace();
+	namespace_t	*	breakeable = findBreakableSpace(false);
 	if (breakeable == nullptr)
 	{
 		CreateError(-7777737, "operator break allowe only witin loops and switches", source.line_number);
@@ -487,7 +499,7 @@ statement_t * namespace_t::CheckOperator_CONTINUE(SourcePtr &source)
 		return nullptr;
 	}
 
-	namespace_t	*	space = findBreakableSpace();
+	namespace_t	*	space = findBreakableSpace(true);
 	if (space == nullptr)
 	{
 		CreateError(-7777737, "operator 'continue' allowed only witin loops and switches", source.line_number);

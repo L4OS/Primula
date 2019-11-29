@@ -166,9 +166,9 @@ typedef struct static_data
 typedef enum {
 	same_types,	// types exactly match
 	cast_type,	// type can be casted to l-value type
-	no_cast		// type cannpt be casted to l-value
+	no_cast		// type cannot be casted to l-value
 } compare_t;
 
-compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mode);
+compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mode, bool zero_rval);
 
 

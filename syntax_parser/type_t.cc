@@ -1,7 +1,11 @@
 #include "type_t.h"
 #include "namespace.h"
 
-compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mode)
+compare_t  CompareTypes(
+	const type_t *	ltype,			// Type of l-value
+	const type_t *	rtype,			// Type of r-value
+	bool			arg_mode,		// Ignore const for l-vavlue
+	bool			zero_rvalue)	// Zero can be assigned to pointers too
 {
 	bool lconst = false;
 	bool rconst = false;
@@ -36,11 +40,15 @@ compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mod
 		switch (ltype->prop)
 		{
 		case type_t::pointer_type:
-			return CompareTypes(((pointer_t*)ltype)->parent_type, ((pointer_t*)rtype)->parent_type, arg_mode);
+			if (zero_rvalue)
+			{
+				return same_types; // Maybe cast_type here for zero pointer?
+			}
+			return CompareTypes(((pointer_t*)ltype)->parent_type, ((pointer_t*)rtype)->parent_type, arg_mode, false);
 
 		case type_t::compound_type:
 		case type_t::enumerated_type:
-			return CompareTypes(ltype, rtype, arg_mode);
+			return CompareTypes(ltype, rtype, arg_mode, false);
 
 		default:
 			if (ltype->bitsize == rtype->bitsize)
@@ -65,6 +73,10 @@ compare_t  CompareTypes(const type_t * ltype, const type_t * rtype, bool arg_mod
 		if (rtype->prop == type_t::unsigned_type || rtype->prop == type_t::signed_type)
 			return cast_type;
 		return no_cast;
+	}
+	if (ltype->prop == type_t::pointer_type && zero_rvalue)
+	{
+		return cast_type; // Maybe same_types?
 	}
 	throw "TODO Finish type comparasion";
 }
