@@ -644,6 +644,26 @@ int parse_preprocessor_if( char * payload  )
 	return status;
 }
 
+static int check_include_file(
+    const char          *   directory,
+    flow_control_t		*	subflow,
+    char				*	payload )
+{
+    int j;
+    for (j = 0; directory[j] && j < sizeof(subflow->filename) - 56; j++)
+        subflow->filename[j] = directory[j];
+    subflow->filename[j++] = '/';
+    for (char * p = payload + 1; ; p++) 
+    {
+        if (*p == '\0')
+            return -946; // Format error of #include command
+        if (*p == '>')	break;
+        subflow->filename[j++] = *p;
+    }
+    subflow->filename[j] = '\0';
+    return _access(subflow->filename, 0) == 0 ? 0 : -947;
+}
+
 //////////////////////////////////////////////////////////////////////////
 //
 //	Разбор директивы #include
@@ -676,7 +696,18 @@ static int parse_include(
 	else if( *payload == '<' ) 
 	{
 		status = -947; // Header file not found
-		for( int i=0; ipath[i]; i++ ) {
+
+        // Try envionment variable
+        char const* c_path = getenv("C_INCLUDE_PATH");
+        if (c_path != NULL)
+        {
+            status = check_include_file(c_path, &subflow, payload);
+        }
+		for( int i=0; status < 0 && ipath[i]; i++ ) 
+        {
+#if true
+            status = check_include_file(ipath[i], &subflow, payload);
+#else
 			int j;
 			for(j=0; ipath[i][j] && j<sizeof(subflow.filename)-56; j++)
 				subflow.filename[j] = ipath[i][j];
@@ -692,6 +723,7 @@ static int parse_include(
 				status = 0;
 				break;
 			}
+#endif
 		}
 		if( status != 0 ) 
 			return status;
