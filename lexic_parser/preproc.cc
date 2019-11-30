@@ -705,25 +705,7 @@ static int parse_include(
         }
 		for( int i=0; status < 0 && ipath[i]; i++ ) 
         {
-#if true
             status = check_include_file(ipath[i], &subflow, payload);
-#else
-			int j;
-			for(j=0; ipath[i][j] && j<sizeof(subflow.filename)-56; j++)
-				subflow.filename[j] = ipath[i][j];
-			subflow.filename[j++] = '/';
-			for( char * p = payload+1; ; p++ ) {
-				if( *p == '\0' )	
-					return -946; // Format error of #include command
-				if( *p == '>' )	break;
-				subflow.filename[j++] = *p;
-			}
-			subflow.filename[j] = '\0';
-			if( _access(subflow.filename, 0) == 0 ) {
-				status = 0;
-				break;
-			}
-#endif
 		}
 		if( status != 0 ) 
 			return status;
@@ -737,7 +719,7 @@ static int parse_include(
 	if (add_include_to_list(subflow.filename) > 1)
 	{
 		printf("skip due to already included %s\nCheck this code. It have issue.\n", subflow.filename);
-		return 0;
+		return 1; // But return positive status
 	}
 	printf("#include %s\n", subflow.filename);
 
