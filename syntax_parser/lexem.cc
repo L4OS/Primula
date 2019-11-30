@@ -94,6 +94,8 @@ extern int GetLexemPriority(lexem_type_t  lex)
 		case lt_void:
 			prio = 2000;
 			break;
+		case lt_true:
+		case lt_false:
 		case lt_this:
 		case lt_variable:
 			prio = 1000; // 'this' word as operand

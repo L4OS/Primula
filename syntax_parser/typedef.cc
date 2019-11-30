@@ -271,8 +271,8 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				}
 				// use default linkage for typedefs
 				linkage_t linkage;
-				function_t * function_ptr = new function_t(type, name);
-				function_overload_t * overload = new function_overload_t(function_ptr, &linkage);
+				function_parser * function_ptr = new function_parser(type, name);
+				function_overload_parser * overload = new function_overload_parser(function_ptr, &linkage);
 				function_ptr->prop = type_t::property_t::funct_ptr_type;
 				if(source.sequence->size() > 0)
 					overload->ParseArgunentDefinition(this, source.sequence);
@@ -282,14 +282,14 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				if (typetype != nullptr)
 				{
 					type_t * t = typetype;
-					if (typetype->prop == type_t::auto_tyoe)
+					if (typetype->prop == type_t::auto_type)
 					{
 						printf("Catch typetype\n");
 						typetype = function_ptr;
 					}
 					while (t->prop == type_t::pointer_type)
 					{
-						if (((pointer_t*)t)->parent_type->prop == type_t::auto_tyoe)
+						if (((pointer_t*)t)->parent_type->prop == type_t::auto_type)
 							break;
 						else
 							t = ((pointer_t*)t)->parent_type;

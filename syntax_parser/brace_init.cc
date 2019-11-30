@@ -254,13 +254,13 @@ static_data_t *  namespace_t::BraceEncodedInitialization(type_t * type, SourcePt
 	{
 		switch (type->prop)
 		{
-		case type_t::pointer_type:
+		case type_t::dimension_type:
 		{
 			if (source.lexem == lt_openblock)
 			{
 				static_data_t * ok = new static_data_t(lt_openblock);
 				type_is_pointer++;
-				type = ((pointer_t*)type)->parent_type;
+				type = ((array_t*)type)->child_type;
 				for (auto statement : *source.statements)
 				{
 					SourcePtr  data_ptr(&statement);

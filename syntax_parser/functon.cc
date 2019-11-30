@@ -1,5 +1,5 @@
 #include "primula.h"
-#include "variable_base_t.h"
+#include "../include/statement_t.h"
 #include "namespace.h"
 
 void function_overload_t::Parse(namespace_t * parent, Code::statement_list_t * source)
@@ -76,7 +76,7 @@ variable_base_t * function_overload_t::FindArgument(std::string name)
 	return var;
 }
 
-statement_t * function_overload_t::CallParser(Code::lexem_list_t args_sequence)
+statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_sequence)
 {
 
 	Code::statement_list_t args;
@@ -139,7 +139,7 @@ statement_t * function_overload_t::CallParser(Code::lexem_list_t args_sequence)
 	return result;
 }
 
-void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, SourcePtr source)
+void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_space, SourcePtr source)
 {
 	int							status = 0;
 	type_t					*	type = nullptr;
@@ -154,7 +154,7 @@ void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, So
 		got_three_dots
 	} state = wait_type;
 
-	for (auto node = source; status >= 0 && ! node.IsFinished(); !node.IsFinished() ? node++ : node)
+	for (auto node = source; status >= 0 && node == true; node == true ? node++ : node)
 	{ 
 		switch (state)
 		{
@@ -219,7 +219,7 @@ void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, So
 			if (node.lexem != lt_word)
 			{
 				status = -7777701;
-				space->CreateError(status, "parser expected name at function_t::ParseArgunentDefinition", node.line_number);
+				space->CreateError(status, "parser expected name at function_parser::ParseArgunentDefinition", node.line_number);
 				node.Finish();
 				continue;
 			}
@@ -243,12 +243,12 @@ void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, So
 			}
 			if (node.lexem == lt_set)
 			{
-				throw "TODO: add default arguments in function_t::ParseArgunentDefinition";
+				throw "TODO: add default arguments in function_parser::ParseArgunentDefinition";
 			}
 			if (node.lexem != lt_comma)
 			{
 				status = -7777701;
-				space->CreateError(status, "parser expected delimiter at function_t::ParseArgunentDefinition", node.line_number);
+				space->CreateError(status, "parser expected delimiter at function_parser::ParseArgunentDefinition", node.line_number);
 				node.Finish();
 				continue;
 			}
@@ -265,7 +265,7 @@ void function_overload_t::ParseArgunentDefinition(namespace_t * parent_space, So
 			continue;
 
 		default:
-			throw "function_t::ParseArgunentDefinition()";
+			throw "function_parser::ParseArgunentDefinition()";
 		}
 	}
 
@@ -319,7 +319,7 @@ void MangleType(const type_t * type, std::string & parent)
 	}
 }
 
-void function_overload_t::MangleArguments()
+void function_overload_parser::MangleArguments()
 {
 	if (arguments.size() > 0)
 	{
@@ -338,12 +338,12 @@ void function_overload_t::MangleArguments()
 	this->mangle = "@" + mangle;
 }
 
-void	function_t::RegisterFunctionOverload(function_overload_t * overload)
+void	function_parser::RegisterFunctionOverload(function_overload_t * overload)
 {
 	this->overload_list.push_back(overload);
 }
 
-void function_t::FindBestFunctionOverload(call_t * call)
+void function_parser::FindBestFunctionOverload(call_t * call)
 {
 	//	function_overload_t * overload = nullptr;
 	for (auto function : this->overload_list)
@@ -387,13 +387,13 @@ void function_t::FindBestFunctionOverload(call_t * call)
 	}
 }
 
-function_overload_t * function_t::FindOverload(call_t * call)
+function_overload_t * function_parser::FindOverload(call_t * call)
 {
 	FindBestFunctionOverload(call);
 	return call->code;
 }
 
-call_t * function_t::TryCallFunction(namespace_t * space, SourcePtr & arg_list)
+call_t * function_parser::TryCallFunction(namespace_t * space, SourcePtr & arg_list)
 {
 	call_t	* call = new call_t(space, this->name, nullptr);
 
@@ -419,10 +419,10 @@ call_t * function_t::TryCallFunction(namespace_t * space, SourcePtr & arg_list)
 	return call;
 }
 
-
 function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name, Code::lexem_list_t * sequence, linkage_t	* linkage)
 {
-	function_t * function = nullptr;
+	function_parser * function = nullptr;
+	function_overload_t * exist = nullptr;
 
 	auto pair = function_map.find(name);
 	if (pair != function_map.end())
@@ -431,13 +431,12 @@ function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name
 	if (function == nullptr)
 	{
 		// Function is not overloaded yet, so create base
-		function = new function_t(type, name);
+		function = new function_parser(type, name);
 		RegisterFunction(name, function, true);
 	}
 
-	function_overload_t	* overload = new function_overload_t(function, linkage);
+	function_overload_parser	* overload = new function_overload_parser(function, linkage);
 
-	function_overload_t * exist = nullptr;
 	if (sequence->size() > 0)
 		overload->ParseArgunentDefinition(this, sequence);
 	overload->MangleArguments();
@@ -451,12 +450,14 @@ function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name
 		}
 	}
 	if (exist == nullptr)
+	{
 		function->RegisterFunctionOverload(overload);
+		exist = overload;
+	}
 	else
 	{
 		delete overload;
-		overload = exist;
 	}
 
-	return overload;
+	return exist;
 }

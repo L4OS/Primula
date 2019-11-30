@@ -11,7 +11,7 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 			return nullptr;
 		}
 		++source;
-		if (!source.IsFinished())
+		if (source == true)
 		{
 			throw "Split lexem error on previous stage";
 		}
@@ -162,13 +162,13 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 		}
 
 		linkage_t	linkage;
-		function_t  * handler = new function_t(GetBuiltinType(lt_void), "");
-		function_overload_t * overload = new function_overload_t(handler, &linkage);
+		function_parser  * handler = new function_parser(GetBuiltinType(lt_void), "");
+		function_overload_parser * overload = new function_overload_parser(handler, &linkage);
 		result->handler = overload;
 		result->handler->space = CreateSpace(spacetype_t::exception_handler_space, "operator");
 		if (source.sequence->size() > 0)
 		{
-			result->handler->ParseArgunentDefinition(this, source.sequence);
+			overload->ParseArgunentDefinition(this, source.sequence);
 		}
 		if (result->handler->arguments.size() != 1)
 		{
@@ -579,7 +579,7 @@ statement_t * namespace_t::CheckOperator_OPERATOR(SourcePtr &source)
 			source++;
 			if (source.lexem == lt_semicolon)
 			{
-				function_t		* function = nullptr;
+				function_parser		* function = nullptr;
 				switch (operator_lexem)
 				{
 				case lt_inc:
@@ -675,7 +675,7 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 	}
 	overload++;
 	overload++;
-	if (overload.IsFinished() || overload.lexem != lt_openblock)
+	if (overload == false || overload.lexem != lt_openblock)
 	{
 		CreateError(-7777704, "non-terminated operator definition", overload.line_number);
 		overload.Finish();

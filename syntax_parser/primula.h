@@ -70,11 +70,6 @@ public:
 		eof = end.index;
 	}
 
-	bool IsFinished()
-	{
-		return index == eof;
-	}
-
 	SourcePtr(Code::lexem_list_t * items)
 	{
 		index = items->begin();
