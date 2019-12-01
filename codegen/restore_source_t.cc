@@ -46,7 +46,7 @@ void GenerateCall(call_t * call)
 		printf("// Parser fault on function call :(\n");
 		return;
 	}
-	if (call->code->function->method_type == function_t::method)
+	if (call->code->function->method_type == function_parser::method)
 		printf("%s", call->code->function->name.c_str());
 	printf("(");
 	for (auto & arg : call->arguments)
@@ -60,10 +60,32 @@ void GenerateCall(call_t * call)
 
 extern int GetLexemPriority(lexem_type_t  lex);
 
+void PrintCharacter(int ch)
+{
+    switch (ch)
+    {
+    case '\0':
+        printf("'\\0'");
+        break;
+    case '\r':
+        printf("'\\r'");
+        break;
+    case '\n':
+        printf("'\\n'");
+        break;
+    case '\t':
+        printf("'\\t'");
+        break;
+    default:
+        printf("'%c'", ch);
+    }
+}
+
 void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 {
 	int my_prio = GetLexemPriority(n->lexem);
 	bool use_brakets = my_prio > parent_priority &&  my_prio < 1000;
+    char * str = nullptr;
 
 	//if (n->lexem != lt_namescope)
 	//{
@@ -80,59 +102,59 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	switch (n->lexem)
 	{
 	case lt_pointer:
-		printf(" * ");
+		str = " * ";
 		break;
 	case lt_indirect_pointer_to_member:
-		printf(" ->* ");
+		str = " ->* ";
 		break;
 	case lt_this:
-		printf("this");
+		str = "this";
 		break;
 	case lt_variable:
 		printf("%s", n->variable->name.c_str());
 		break;
 	case lt_inc:
-		printf("++"); // , n->right->variable->name.c_str());
+		str = "++";
 		break;
 	case lt_dec:
-		printf("--"); // , n->right->variable->name.c_str());
+		str = "--";
 		break;
 	case lt_set:
-		printf(" = ");
+		str = " = ";
 		break;
 	case lt_add:
-		printf(" + ");
+		str = " + ";
 		break;
 	case lt_add_and_set:
-		printf(" += ");
+		str = " += ";
 		break;
 	case lt_sub:
-		printf(" - ");
+		str = " - ";
 		break;
 	case lt_mul:
-		printf(" * ");
+		str = " * ";
 		break;
 	case lt_div:
-		printf(" / ");
+		str = " / ";
 		break;
 	case lt_and:
 	case lt_addrres:
-		printf(" & ");
+		str = " & ";
 		break;
 	case lt_shift_left:
-		printf(" << ");
+		str = " << ";
 		break;
 	case lt_shift_right:
-		printf(" >> ");
+		str = " >> ";
 		break;
 	case lt_or:
-		printf(" | ");
+		str = " | ";
 		break;
 	case lt_dot:
-		printf(".");
+		str = ".";
 		break;
 	case lt_point_to:
-		printf("->");
+		str = "->";
 		break;
 	case lt_integer:
 		printf("%d", n->constant->integer_value);
@@ -140,55 +162,52 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	case lt_string:
 		printf("\"%s\"", n->constant->char_pointer);
 		break;
-	//case lt_hexdecimal:
-	//	printf("0x%x", n->constant->integer_value);
-	//	break;
 	case lt_character:
-		printf("'%c'", n->constant->integer_value);
+        PrintCharacter(n->constant->integer_value);
 		break;
 	case lt_equally:
-		printf(" == ");
+		str = " == ";
 		break;
 	case lt_logical_not:
-		printf(" ! ");
+		str = " ! ";
 		break;
 	case lt_logical_and:
-		printf(" && ");
+		str = " && ";
 		break;
 	case lt_logical_or:
-		printf(" || ");
+		str = " || ";
 		break;
 	case lt_less:
-		printf(" < ");
+		str = " < ";
 		break;
 	case lt_less_eq:
-		printf(" <= ");
+		str = " <= ";
 		break;
 	case lt_more:
-		printf(" > ");
+		str = " > ";
 		break;
 	case lt_more_eq:
-		printf(" >= ");
+		str = " >= ";
 		break;
 	case lt_quest:
-		printf(" ? ");
+		str = " ? ";
 		break;
 	case lt_colon:
-		printf(" : ");
+		str = " : ";
 		break;
 	case lt_rest:
-		printf(" %% ");
+		str = " %% ";
 		break;
 	case lt_rest_and_set:
-		printf(" %%= ");
+		str = " %%= ";
 		break;
 	case lt_xor:
-		printf(" ^ ");
+		str = " ^ ";
 		break;
 	case lt_namescope:
-		printf(" :: ");
+		str = " :: ";
 	case lt_indirect:
-		printf(" *");
+		str = " *";
 		break;
 	case lt_call:
 		GenerateCall(n->call);
@@ -197,17 +216,17 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 		GenerateCall(n->call);
 		break;
 	case lt_unary_plus:
-		printf(" +");
+		str = " +";
 		break;
 	case lt_unary_minus:
-		printf(" -");
+		str = " -";
 		break;
 
 	case lt_true:
-		printf(" true ");
+		str = " true ";
 		break;
 	case lt_false:
-		printf(" false ");
+		str = " false ";
 		break;
 
 	case lt_openindex:
@@ -242,7 +261,7 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 
 	case lt_function_address:
 	{
-		function_t * function = (function_t*)n->type;
+		function_parser * function = (function_parser*)n->type;
 		printf("%s;%s", function->name.c_str(), NewLine);
 		break;
 	}
@@ -251,6 +270,9 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 		throw "Cannot generate lexem";
 		break;
 	}
+
+    if (str != nullptr)
+        printf(str);
 
 	if (n->right)
 		GenerateItem(n->right, my_prio);
@@ -302,7 +324,7 @@ bool GenerateTypeName(type_t * type, const char * name)
 		}
 		case type_t::property_t::funct_ptr_type:
 		{
-			function_t * func_ptr = (function_t*)type;
+			function_parser * func_ptr = (function_parser*)type;
 			printf("%s", func_ptr->name.c_str());
 			if (name)
 				printf(" %s", name);
@@ -677,14 +699,14 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
 	}
 	switch (overload->function->method_type)
 	{
-	case function_t::method:
+	case function_parser::method:
 		GenerateTypeName(overload->function->type, nullptr);
 		break;
-	case function_t::constructor:
+	case function_parser::constructor:
 		printf("// Constructor\n");
 		printf(NewLine);
 		break;
-	case function_t::destructor:
+	case function_parser::destructor:
 		printf("// Desctructor\n");
 		printf(NewLine);
 		break;
@@ -694,7 +716,7 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
 		// Check class name. TODO Check namespaces
 		if (overload->space != nullptr) // <-------------- This is hack. Must be eliminated
 			if (overload->space->parent != nullptr &&
-				(overload->space->parent->type == namespace_t::spacetype_t::structure_space) &&
+				(overload->space->parent->type == space_t::spacetype_t::structure_space) &&
 				(overload->linkage.storage_class != linkage_t::sc_inline))
 			{
 				printf("%s", overload->space->parent->name.c_str());
@@ -727,7 +749,7 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
 		printf(";\n");
 }
 
-void GenerateFunction(function_t * f, bool proto)
+void GenerateFunction(function_parser * f, bool proto)
 {
 	for (function_overload_t * overload : f->overload_list)
 	{
@@ -752,12 +774,12 @@ void GenerateType(type_t * type, bool inlined_only)
 	}
 	else if (type->prop == type_t::property_t::funct_ptr_type)
 	{
-		function_t * func_ptr = (function_t*)type;
+		function_parser * func_ptr = (function_parser*)type;
 		GenerateTypeName(func_ptr->type, nullptr);
 		printf("%s(", func_ptr->name.c_str());
 		for (auto func : func_ptr->overload_list)
 		{
-			//			function_t * func = (function_t*)func_ptr;
+			//			function_parser * func = (function_parser*)func_ptr;
 			for (auto & arg : func->arguments)
 			{
 				GenerateTypeName(arg.type, arg.name.c_str());
@@ -843,7 +865,7 @@ void GenerateType(type_t * type, bool inlined_only)
 			printf(";\n");
 		}
 	}
-	else if (type->prop == type_t::property_t::auto_tyoe)
+	else if (type->prop == type_t::property_t::auto_type)
 	{
 		printf("/* AUTO */");
 	}
@@ -880,12 +902,12 @@ void GenerateSpace(namespace_t * space)
 		for (auto f : space->function_list)
 			for (auto overload : f->overload_list)
 			{
-				if (overload->linkage.storage_class == linkage_t::sc_inline || space->type != namespace_t::spacetype_t::structure_space)
+				if (overload->linkage.storage_class == linkage_t::sc_inline || space->type != space_t::spacetype_t::structure_space)
 				{
 					if (overload->space != nullptr)
 					{
 						bool proto = false;
-						if (overload->space->parent->type == namespace_t::spacetype_t::structure_space)
+						if (overload->space->parent->type == space_t::spacetype_t::structure_space)
 							proto = overload->linkage.storage_class != linkage_t::sc_inline;
 						GenerateFunctionOverload(overload, proto);
 					}
