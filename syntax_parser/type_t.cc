@@ -74,9 +74,12 @@ compare_t  CompareTypes(
 			return cast_type;
 		return no_cast;
 	}
-	if (ltype->prop == type_t::pointer_type && zero_rvalue)
+	if (ltype->prop == type_t::pointer_type)
 	{
-		return cast_type; // Maybe same_types?
+        if(zero_rvalue)
+		    return cast_type; // Maybe same_types?
+        if (rtype->prop == type_t::dimension_type)
+            return CompareTypes(((pointer_t*)ltype)->parent_type, ((array_t*)rtype)->child_type, arg_mode, false);
 	}
 	throw "TODO Finish type comparasion";
 }

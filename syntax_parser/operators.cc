@@ -185,6 +185,7 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 			CreateError(-7777795, "'catch' exception handler body expected", source.line_number);
 			continue;
 		}
+        result->handler->space->owner_function = result->handler;
 		result->handler->space->Parse(*source.statements);
 		source++;
 		return result;
@@ -229,7 +230,7 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 
 		case true_condition_state:
 			result->true_statement = CreateStatement(source, spacetype_t::codeblock_space);
-			if (source != false && source.lexem == lt_semicolon)
+			if (source != false && (source.lexem == lt_semicolon || source.lexem == lt_openblock))
 				++source; // Check this later
 			state = check_else_state;
 			continue;
@@ -456,16 +457,27 @@ statement_t * namespace_t::CheckOperator_BREAK(SourcePtr &source)
 statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
 {
 	operator_CASE	*	result = nullptr;
+    variable_base_t *   en = nullptr;
 	int case_value = 0;
 
 	do {
-		if (source.lexem != lt_integer)
-		{
-			CreateError(-7777938, "non integer case label", source.line_number);
-			source.Finish();
-			continue;
-		}
-		case_value = std::stoi(source.value);
+        if (source.lexem == lt_word)
+        {
+            en = TryEnumeration(source.value, false);
+            if (en->static_data->type != lt_integer)
+                throw "namespace_t::CheckOperator_CASE - enumeration must be integer type";
+            case_value = en->static_data->s_int;
+        }
+        if (en == nullptr)
+        {
+            if(source.lexem != lt_integer)
+            {
+                CreateError(-7777938, "non integer case label", source.line_number);
+                source.Finish();
+                continue;
+            }
+            case_value = std::stoi(source.value);
+        }
 		source++;
 		if (source.lexem != lt_colon)
 		{

@@ -27,6 +27,7 @@ class CodeSplitter : public Code
 			lexem_list_t::iterator  node = statement_src->begin();
 			lexem_list_t::iterator  end = statement_src->end();
 			bool	check_block = false;
+            bool    keep_prev = false;
 
 			if (fix != nullptr)
 			{
@@ -49,13 +50,13 @@ class CodeSplitter : public Code
 				case lt_union:
 				case lt_enum:
 				case lt_class:
-				case lt_try:
-					//printf("Found that\n");
+                case lt_try:
+                    //printf("Found that\n");
 					check_block = true;
 					break;
 
 				case lt_openblock:
-					/*last_result =*/ FixThree(node->statements);
+					FixThree(node->statements);
 					if (check_block)
 					{
 						fix = &*statement_src;
@@ -66,27 +67,37 @@ class CodeSplitter : public Code
 				case lt_else:
 					while (node != end)
 					{
+                        if (node->lexem == lt_openblock)
+                            FixThree(node->statements);
 						prev->push_back(*node);
 						node++;
 					}
-					prev = statement_src;
-					statement_src++;
-					list->erase(prev);
-					check_block = false;
-					if (statement_src == statement_eof)
-						return;
+                    {
+                        keep_prev = true;
+                        statement_list_t::iterator	remove = statement_src;
+                        statement_src++;
+                        list->erase(remove);
+                        check_block = false;
+                        if (statement_src == statement_eof)
+                            return;
+                    }
 					continue;
 
-				default:
+                default:
 					check_block = false;
 					break;
 				}
 				node++;
 			}
-			prev = statement_src;
-			if (statement_src == statement_eof)
-				break;
-			statement_src++;
+            if (keep_prev)
+                keep_prev = false;
+            else
+            {
+                prev = statement_src;
+                if (statement_src == statement_eof)
+                    break;
+                statement_src++;
+            }
 		}
 	}
 
@@ -209,7 +220,7 @@ public:
 		}
 
 		default:
-			current_node->push_back(lex);
+            current_node->push_back(lex);
 		}
 	}
 };
