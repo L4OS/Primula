@@ -126,20 +126,21 @@ void lexem_to_string(lexem_item_t * l, char * txt_buff, int buff_size)
 
 int restore_code(FILE * inp, FILE * of)
 {
-	int					status = -1;
-	char			*	eof;
+	int			        status = -1;
+	char		    *	eof;
 	lexem_type_t		id;
 	lexem_item_t		l;
-	char				buffer[1024];
-	char				arg[1024];
-	int					tabs = 0;
-	bool				crlf = false;
-	int					prev_line = 1;
-	int					line_number = 0;
+	char			    buffer[1024];
+	char			    arg[1024];
+	int			        tabs = 0;
+	bool			    crlf = false;
+	int			        prev_line = 1;
+	int			        line_number = 0;
 	while (true)
 	{
 		eof = fgets(buffer, sizeof(buffer) - 1, inp);
-		if (!eof) break; 
+		if (!eof) 
+            break; 
 		if (buffer[0] == '/')
 		{
 			fputs(buffer, of);
@@ -148,8 +149,7 @@ int restore_code(FILE * inp, FILE * of)
 		else if (buffer[0] == '@')
 		{
 			sscanf(&buffer[1], "%u", &line_number);
-			// for (int i = prev_line; i < line_number; i++) 
-				fprintf(of, "\n");
+			fprintf(of, "\n");
 			crlf = true;
 			prev_line = line_number;
 		}
@@ -187,9 +187,9 @@ int restore_code(FILE * inp, FILE * of)
 
 			if (crlf)
 			{
-				for (int i = 0; i < tabs; i++) fputs("  ", of);
+				for (int i = 0; i < tabs; i++) 
+                    fputs("  ", of);
 				crlf = false;
-
 			}
 			fprintf(of, "%s", buffer);
 
