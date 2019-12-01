@@ -67,6 +67,15 @@ void PrintCharacter(int ch)
     case '\0':
         printf("'\\0'");
         break;
+    case '\\':
+        printf("'\\\\'");
+        break;
+    case '\'':
+        printf("'\\''");
+        break;
+    case '\"':
+        printf("'\\\"'");
+        break;
     case '\r':
         printf("'\\r'");
         break;
