@@ -106,7 +106,11 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 			result = ParseExpression(source);
 			break;
 		}
-	default:
+        CreateError(-7777795, "'%s' not defined ", source.line_number, source.value.c_str());
+        source.Finish();
+        break;
+
+    default:
 		result = CheckOperators(source);
 		if (result == nullptr)
 		{
@@ -253,7 +257,7 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 
 		case else_condition_state:
 			result->false_statement = CreateStatement(source, spacetype_t::codeblock_space);
-			if (source.lexem == lt_semicolon)
+			if (source == true && source.lexem == lt_semicolon)
 				++source;
 			state = no_more_lexem_state;
 			continue;

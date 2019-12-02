@@ -68,7 +68,7 @@ compare_t  CompareTypes(
 	{
 		return no_cast;
 	}
-	if (ltype->prop == type_t::float_type)
+	if (ltype->prop == type_t::float_type || ltype->prop == type_t::enumerated_type)
 	{
 		if (rtype->prop == type_t::unsigned_type || rtype->prop == type_t::signed_type)
 			return cast_type;

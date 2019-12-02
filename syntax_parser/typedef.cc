@@ -43,7 +43,7 @@ type_t * namespace_t::TypeDefOpenBraket(SourcePtr & source, std::string & name, 
 		throw "namespace_t::ParseTypeDefinition: FSM unparsed lexem";
 	}
 	if (source == false)
-		printf("Debug and remove");
+		fprintf(stderr, "Debug and remove");
 	source++;
 	return type;
 }
