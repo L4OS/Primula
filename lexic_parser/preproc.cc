@@ -718,7 +718,7 @@ static int parse_include(
 	}
 	if (add_include_to_list(subflow.filename) > 1)
 	{
-		printf("skip due to already included %s\nCheck this code. It have issue.\n", subflow.filename);
+//		printf("skip due to already included %s\nCheck this code. It have issue.\n", subflow.filename);
 		return 1; // But return positive status
 	}
 	printf("#include %s\n", subflow.filename);
