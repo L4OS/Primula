@@ -177,6 +177,9 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	case lt_equally:
 		str = " == ";
 		break;
+    case lt_not_eq:
+        str = " != ";
+        break;
 	case lt_logical_not:
 		str = " ! ";
 		break;
