@@ -27,5 +27,6 @@ extern "C" int snprintf ( char * s, int n, const char * format, ... );
 extern "C" char * fgets ( char * str, int num, FILE * stream );
 extern "C" int sscanf ( const char * s, const char * format, ...);
 extern "C" int fprintf ( FILE * stream, const char * format, ... );
+extern "C" int printf( const char * format, ... );
 
 #endif
