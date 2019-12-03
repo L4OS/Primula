@@ -153,7 +153,10 @@ class return_t : public statement_t
 {
 public:
 	expression_t	*	return_value;
-	return_t() : statement_t(_return) {}
+	return_t() : statement_t(_return) 
+    {
+        return_value = nullptr;
+    }
 };
 
 class operator_LABEL : public statement_t
