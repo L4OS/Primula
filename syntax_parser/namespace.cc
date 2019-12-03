@@ -1150,8 +1150,10 @@ int namespace_t::ParseStatement(SourcePtr &source)
 //						printf("operator parsed\n");
 						continue;
 					}
-					if (source.lexem != lt_semicolon)
-						printf("Expected semicolon\n");
+                    if (source.lexem != lt_semicolon)
+                    {
+//                      fprintf(stderr, "Expected semicolon\n");
+                    }
 					source++;
 					continue;
 				}

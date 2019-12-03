@@ -66,7 +66,7 @@ compare_t  CompareTypes(
 	}
 	if (ltype->prop == type_t::unsigned_type)
 	{
-		return no_cast;
+        return (rtype->prop == type_t::signed_type) ? cast_type : no_cast;
 	}
 	if (ltype->prop == type_t::float_type || ltype->prop == type_t::enumerated_type)
 	{
@@ -76,10 +76,15 @@ compare_t  CompareTypes(
 	}
 	if (ltype->prop == type_t::pointer_type)
 	{
+        type_t * ptr_to = ((pointer_t*)ltype)->parent_type;
         if(zero_rvalue)
 		    return cast_type; // Maybe same_types?
         if (rtype->prop == type_t::dimension_type)
-            return CompareTypes(((pointer_t*)ltype)->parent_type, ((array_t*)rtype)->child_type, arg_mode, false);
+        {
+            if (ptr_to->prop == type_t::void_type)
+                return same_types;
+            return CompareTypes(ptr_to, ((array_t*)rtype)->child_type, arg_mode, false);
+        }
 	}
 	throw "TODO Finish type comparasion";
 }

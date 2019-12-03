@@ -79,6 +79,8 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 
 restore_source_t			global_space;
 
+extern void InitialNamespace(namespace_t * space);
+
 int main(int argc, char * argv[])
 {
 	FILE * f;
@@ -98,14 +100,12 @@ int main(int argc, char * argv[])
 
 	fclose(f);
 
-	puts("--------------------------------------------------------");
+	fprintf(stderr, "------------- Starting syntax parsing ------------------\n");
 
-	void InitialNamespace(namespace_t * space);
 	InitialNamespace(&global_space);
-
 	global_space.Parse(result);
 
-	puts("--------------------------------------------------------");
+    fprintf(stderr, "------------- Syntax parsing complete ------------------\n");
 
 	global_space.GenerateCode(&global_space);
 

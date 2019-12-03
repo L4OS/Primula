@@ -66,7 +66,7 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 			case same_types:	// types exactly match
 				break;
 			case cast_type:	// r-value type can be casted to l-value type
-				printf("Add casting to an expression\n");
+				fprintf(stderr, "Add casting to an expression\n");
 				break;
 			case no_cast:		// r-value type cannot be casted to l-value type
 				CreateError(-7777000, "function return argument type does not match to function type", source.line_number);
@@ -98,6 +98,8 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 	case lt_namescope:
 	case lt_addrres:
 	case lt_mul:
+    case lt_inc:
+    case lt_dec:
 		result = ParseExpression(source);
 		break;
 	case lt_word:
@@ -458,6 +460,24 @@ statement_t * namespace_t::CheckOperator_BREAK(SourcePtr &source)
 	return statement;
 }
 
+char namespace_t::TranslateCharacter(SourcePtr source)
+{
+    char ch = 0;
+    if (source.lexem != lt_character)
+        throw "FSM error: translate character lexem is not character";
+    if ( source.value.length() == 2 && source.value[0] == '\\')
+        switch (source.value[1])
+        {
+        default:
+            CreateError(-7776137, "Unparsed character sequence", source.line_number);
+            break;
+        }
+    else
+        ch = source.value[0];
+
+    return ch;
+}
+
 statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
 {
 	operator_CASE	*	result = nullptr;
@@ -474,13 +494,19 @@ statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
         }
         if (en == nullptr)
         {
-            if(source.lexem != lt_integer)
+            switch (source.lexem)
             {
+            case lt_integer:
+                case_value = std::stoi(source.value);
+                break;
+            case lt_character:
+                case_value = TranslateCharacter(source);
+                break;
+            default:
                 CreateError(-7777938, "non integer case label", source.line_number);
                 source.Finish();
                 continue;
             }
-            case_value = std::stoi(source.value);
         }
 		source++;
 		if (source.lexem != lt_colon)
