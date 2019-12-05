@@ -278,6 +278,14 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 		break;
 	}
 
+    case lt_operator_postinc:
+    case lt_operator_postdec:
+    {
+        GenerateItem(n->right);
+        printf(n->lexem == lt_operator_postinc ? "++ " : "-- ");
+        return;
+    }
+
 	default:
 		throw "Cannot generate lexem";
 		break;
@@ -291,18 +299,6 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 
 	if (use_brakets)
 		printf(") ");
-
-	switch (n->postfix)
-	{
-	case lt_empty:
-		break;
-	case lt_inc:
-		printf("++ ");
-		break;
-	case lt_dec:
-		printf("-- ");
-		break;
-	}
 }
 
 void GenerateExpression(expression_t * exp)
@@ -426,8 +422,15 @@ void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false
 		{
 			if (!selfformat)
 				printf("\n%s", NewLine);
-			bool last = (compound == data->nested->back());
-			GenerateStaticData(compound, last, true);
+            if (compound == nullptr)
+            {
+                printf("/* something goes wrong */0, ");
+            }
+            else
+            {
+                bool last = (compound == data->nested->back());
+                GenerateStaticData(compound, last, true);
+            }
 		}
 		if(selfformat)
 			printf("}");
@@ -523,12 +526,22 @@ void GenerateStatement(statement_t * code)
 	{
 		operator_IF * op = (operator_IF*)code;
 		printf("if(");
-		GenerateExpression(op->expression);
+        if (op->expression == nullptr)
+            printf("/* error expression parsing */");
+        else
+		    GenerateExpression(op->expression);
 		printf(")");
-		bool block = (op->true_statement->type == statement_t::_codeblock);
-		if (!block)
-			printf("\n    ");
-		GenerateStatement(op->true_statement);
+        if (op->true_statement == nullptr)
+        {
+            printf("/* true 'if' statements lost */\n");
+        }
+        else
+        {
+            bool block = (op->true_statement->type == statement_t::_codeblock);
+            if (!block)
+                printf("\n    ");
+            GenerateStatement(op->true_statement);
+        }
 
 		if (op->false_statement != nullptr)
 		{
