@@ -28,5 +28,11 @@ extern "C" char * fgets ( char * str, int num, FILE * stream );
 extern "C" int sscanf ( const char * s, const char * format, ...);
 extern "C" int fprintf ( FILE * stream, const char * format, ... );
 extern "C" int printf( const char * format, ... );
+extern "C" FILE* fdopen( int fd, const char * mode );
+extern "C" FILE* fopen(const char *path, const char *mode );
+extern "C" int  fclose( FILE * stream );
+extern "C" int  fgetc( FILE * stream );
+extern "C" int  feof( FILE * stream );
+extern "C" void perror(const char * str);
 
 #endif
