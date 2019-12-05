@@ -9,7 +9,7 @@ public:
 	type_t					*	type;
 	bool						is_constant;
 	lexem_type_t				lexem;
-	lexem_type_t				postfix;
+//	lexem_type_t				postfix;
 	expression_node_t		*	left;
 	expression_node_t		*	right;
 	class variable_base_t	*	variable;

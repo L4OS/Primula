@@ -160,6 +160,8 @@ typedef enum {
 	lt_array_of_types,
 	lt_function_address,
 	lt_argument,
+    lt_operator_postinc,
+    lt_operator_postdec,
 
 // Something wrong
 	lt_error = -1
