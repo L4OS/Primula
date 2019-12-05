@@ -123,7 +123,7 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 		}
 
 		arg++;
-		if (arg_proto->type != 0) // Эмуляция многоточия
+		if (arg_proto->type != 0) // ГќГ¬ГіГ«ГїГ¶ГЁГї Г¬Г­Г®ГЈГ®ГІГ®Г·ГЁГї
 			arg_proto++;
 	}
 
