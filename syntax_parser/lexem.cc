@@ -54,7 +54,7 @@ lexem_desc_t	fast_option[] =
 	{ lt_not_eq, 90},
 	{ lt_logical_not, 30},
 	{ lt_quest, 150},
-	{ lt_point_to, 40},
+	{ lt_point_to, 20},
 	{ lt_equally, 90},
 	{ lt_character, 1000},
 	{ lt_dot, 20},
@@ -91,6 +91,10 @@ extern int GetLexemPriority(lexem_type_t  lex)
 		case lt_indirect_pointer_to_member:
 			prio = 40;
 			break;
+        case lt_operator_postinc:
+        case lt_operator_postdec:
+            prio = 20;
+            break;
 		case lt_void:
 			prio = 2000;
 			break;

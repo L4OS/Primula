@@ -1,5 +1,23 @@
 #include "namespace.h"
 
+expression_node_t * namespace_t::TryEnumeration(std::string name)
+{
+    expression_node_t * node = nullptr;
+    if (this->enum_map.count(name) > 0)
+    {
+        auto pair = this->enum_map.find(name);
+        int val = pair->second;
+
+        node = new expression_node_t(lt_integer);
+        node->type = this->GetBuiltinType(lt_type_int);
+        node->is_constant = true;
+        node->constant = new constant_node_t(val);
+    }
+    else if (parent != nullptr)
+        return parent->TryEnumeration(name);
+    return node;
+}
+
 variable_base_t * namespace_t::TryEnumeration(std::string name, bool self_space)
 {
 	variable_base_t * result = nullptr;
@@ -66,6 +84,7 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 
 	std::string		item_name;
 	int				item_index = 0;
+    int             linenum = 0;
 	auto  enumeration = statements->begin();
 	if (enumeration != statements->end())
 		for (auto item : *enumeration)
@@ -80,6 +99,7 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 				}
 				item_name = item.value;
 				state = next_state;
+                linenum = item.line_number;
 				continue;
 
 			case next_state:
@@ -140,7 +160,12 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 	// Add last item to enumeration
 	if (item_name.size() > 0)
 	{
-		result->enumeration.insert(std::make_pair(item_name, item_index));
+        bool success = TryRegisterEnumeration(this, item_name, item_index, linenum);
+        if (!success)
+        {
+            return result;
+        }
+        result->enumeration.insert(std::make_pair(item_name, item_index));
 	}
 	return result;
 }

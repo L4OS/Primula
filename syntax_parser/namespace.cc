@@ -388,26 +388,40 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			type_t * is_type = this->TryLexenForType(args);
 			if (is_type == nullptr)
 			{
-				fprintf(stderr, "This is an instance of %s %s(%s)\n", type->name.c_str(), name.c_str(), args.value.c_str());
-				// TODO: Check that constructor is matched to arguemts
+                if (type->name == name)
+                {
+                    fprintf(stderr, "This is an instance of %s %s(%s)\n", type->name.c_str(), name.c_str(), args.value.c_str());
+                    // TODO: Check that constructor is matched to arguemts
 
-				variable_base_t * instance = CreateVariable(type, name, linkage);
-				if (type->prop != type_t::compound_type)
-				{
-					throw "Default constructors for non-compound types is not implemented yet";
-				}
-				structure_t * structure = (structure_t*)type;
-				function_parser * constructor = structure->space->FindFunction(type->name);
-				if (constructor != nullptr)
-				{
-					call_t	* call = constructor->TryCallFunction(this, args);
-				}
-				else
-				{
-					throw "Cannot find constructor on conpound variable declaration";
-				}
-				source++;
-				return;
+                    variable_base_t * instance = CreateVariable(type, name, linkage);
+                    if (type->prop != type_t::compound_type)
+                    {
+                        throw "Default constructors for non-compound types is not implemented yet";
+                    }
+                    structure_t * structure = (structure_t*)type;
+                    function_parser * constructor = structure->space->FindFunction(type->name);
+                    if (constructor != nullptr)
+                    {
+                        call_t	* call = constructor->TryCallFunction(this, args);
+                    }
+                    else
+                    {
+                        throw "Cannot find constructor on conpound variable declaration";
+                    }
+                    source++;
+                    return;
+                }
+                switch (args.lexem)
+                {
+                case lt_string:
+                case lt_class:
+                case lt_enum:
+                    break;
+                default:
+                    CreateError(-7777774, "non-terminated function definition", source.line_number);
+                    source.Finish();
+                    return;
+                }
 			}
 		}
 		source++;
@@ -564,10 +578,11 @@ int namespace_t::ParseStatement(SourcePtr &source)
 	parent_spaces_t     inherited_from;
 	bool                destructor = false;
 
-	type_t                          *	type; // = nullptr;
-	variable_base_t                 *	variable; // = nullptr;
-	function_parser                 *	function; // = nullptr;
-	statement_t						*	code; // = nullptr;
+	type_t                          *	type = nullptr;
+    type_t                          *   comma_type = nullptr;
+	variable_base_t                 *	variable = nullptr;
+	function_parser                 *	function = nullptr;
+	statement_t						*	code = nullptr;
 
 	static int debug_line = 0;
 	while (source != false)
@@ -579,10 +594,10 @@ int namespace_t::ParseStatement(SourcePtr &source)
 		switch (state)
 		{
 		case startup_state:
-			type = nullptr;
-			variable = nullptr;
-			function = nullptr;
-			code = nullptr;
+			//type = nullptr;
+			//variable = nullptr;
+			//function = nullptr;
+			//code = nullptr;
 			CheckStorageClass(source, &linkage);
 			state = parsing_state;
 			continue;
@@ -817,6 +832,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				source++;
 				continue;
 			case lt_comma:
+                type = comma_type;
 				state = type_state;
 				source++;
 				continue;
@@ -873,6 +889,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			type = GetBuiltinType(source.lexem);
 			if (type != nullptr)
 			{
+                comma_type = type;
 				state = type_state;
 				source++;
 				continue;
@@ -887,7 +904,8 @@ int namespace_t::ParseStatement(SourcePtr &source)
 
 			case lt_typedef:
 				type = ParseTypeDefinition(source);
-				state = type_state;
+                comma_type = type;
+                state = type_state; // Are you sure?
 				continue;
 
 			case lt_struct:
@@ -930,7 +948,8 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					source.Finish();
 					continue;
 				}
-				state = type_state;
+                comma_type = type;
+                state = type_state;
 				source++;
 				continue;
 
@@ -966,17 +985,19 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			case lt_this:
 			case lt_inc:
 			case lt_dec:
+            case lt_namescope:
 			{
 				expression_t  *  code = ParseExpression(source);
 				//
 				// add expressiob to list
 				//
 				this->space_code.push_back(code);
-				if (source != false)
+				if (source != false && source != lt_semicolon)
 				{
 					fprintf(stderr, "Skip something\n");
 					source.Finish();
 				}
+                source++;
 				continue;
 			}
 
@@ -986,22 +1007,27 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				break;
 
             case lt_openblock:
-                current_space = this->CreateSpace(namespace_t::spacetype_t::name_space, "just_block");
+            {
+                current_space = this->CreateSpace(namespace_t::spacetype_t::codeblock_space, "just_block");
                 // call to parser namesoace's statements
                 for (auto statement : *source.statements)
                 {
                     current_space->ParseStatement(statement);
                 }
+                codeblock_t * codeblock = new codeblock_t;
+                codeblock->block_space = current_space;
                 current_space = current_space->Parent();
-                fprintf(stderr, "Don't forget insert this block to code!\n");
-                source++;
-                break;
+                this->space_code.push_back(codeblock);
+            }
+            source++;
+            break;
 
 			case lt_word:
 				type = TryLexenForType(source);
 				if (type != nullptr)
 				{
-					state = type_state;
+                    comma_type = type;
+                    state = type_state;
 					source++;
 					continue;
 				}
@@ -1011,7 +1037,8 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					CreateError(-777745, "type expected for variable declaration", source.line_number);
 #if true  // true for C-ctyle, false for C++ style
 					type = GetBuiltinType(lt_type_int);
-					state = type_state;
+                    comma_type = type;  // Will not used for such case?
+                    state = type_state;
 #else
 					source.Finish();
 #endif
@@ -1131,11 +1158,17 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				code = CheckOperators(source);
 				if (code != nullptr)
 				{
-					if (this->type == spacetype_t::function_space || 
-						this->type == spacetype_t::switch_space ||
-						this->type == spacetype_t::codeblock_space ||
-						this->type == spacetype_t::continue_space ||
-						this->type == namespace_t::exception_handler_space)
+                    space_t * space = this;
+                    while (space)
+                    {
+                        if (space->type == spacetype_t::function_space)
+                            break;
+                        space = space->parent;
+                    }
+					if (space!= nullptr && 
+                        (this->type != spacetype_t::structure_space && 
+                            this->type != spacetype_t::name_space &&
+                            this->type != spacetype_t::template_space) )
 					{
 						space_code.push_back(code);
 					}
@@ -1171,7 +1204,8 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			}
 			else
 				type = FindType(name);
-			state = type_state; // wait_delimiter_state;
+            comma_type = type;
+            state = type_state;
 			continue;
 
 		case check_enumeration_state:
@@ -1184,7 +1218,8 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			}
 			else
 				type = FindType(name);
-			state = type_state;
+            comma_type = type;
+            state = type_state;
 			continue;
 
 		case wait_delimiter_state:

@@ -5,7 +5,6 @@ static namespace_t * expression_space = nullptr;
 expression_node_t::expression_node_t(const expression_node_t * node)
 {
 	this->lexem = node->lexem;
-	this->postfix = node->postfix;
 	this->is_constant = node->is_constant;
 	if (node->type)
 		this->type = expression_space->TryTranslateType(node->type);

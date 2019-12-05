@@ -149,48 +149,81 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 
 	enum {
 		wait_type,
-		wait_name,
+        wait_only_pointer,
+        wait_name,
 		wait_delimiter,
 		got_three_dots
 	} state = wait_type;
 
-	for (auto node = source; status >= 0 && node == true; node == true ? node++ : node)
+	for (auto node = source; status == 0 && node == true; node == true ? node++ : node)
 	{ 
 		switch (state)
 		{
 		case wait_type:
-			if (node.lexem == lt_const)
-			{
-//				type = (type != nullptr) ? new const_t(type) : new const_t;
-				const_arg = true;
-				continue;
-			}
+        {
+            switch (node.lexem)
+            {
+            case lt_const:
+            {
+                //				type = (type != nullptr) ? new const_t(type) : new const_t;
+                const_arg = true;
+                continue;
+            }
+            case lt_three_dots:
+            {
+                argument = new farg_t(this->space, nullptr, "...");
+                arguments.push_back(*argument);
+                state = got_three_dots;
+                status = 1;
+                continue;
+            }
+            default:
+                type = parent_space->GetBuiltinType(node.lexem);
+                if (type == nullptr)
+                {
+                    type = parent_space->TryLexenForType(node);
+                }
+                if (type == nullptr)
+                {
+                    switch (node.lexem)
+                    {
+                    case lt_struct:
+                    case lt_class:
+                    case lt_enum:
+                        state = wait_only_pointer;
+                        continue;
+                    default:
+                        status = -7777786;
+                        parent_space->CreateError(status, "argument's type expected", node.line_number);
+                        node.Finish();
+                        continue;
+                    }
+                }
+                if (const_arg)
+                {
+                    type = new const_t(type);
+                }
+                state = wait_name;
+                continue;;
+            }
+        }
 
-			if (node.lexem == lt_three_dots)
-			{
-				argument = new farg_t(this->space, nullptr, "...");
-				arguments.push_back(*argument);
-				state = got_three_dots;
-				break;
-			}
-			type = parent_space->GetBuiltinType(node.lexem);
-			if (type == nullptr)
-			{
-				type = parent_space->TryLexenForType(node);
-			}
-			if (type == nullptr)
-			{
-				status = -7777786;
-				this->space->CreateError(status, "argument's type expected", node.line_number);
-				node.Finish();
-				continue;
-			}
-			if (const_arg)
-			{
-				type = new const_t(type);
-			}
-			state = wait_name;
-			continue;;
+        case wait_only_pointer:
+        {
+            if (node.lexem == lt_mul)
+            {
+                type = parent_space->GetBuiltinType(lt_void);
+                if (const_arg)
+                    type = new const_t(type);
+                type = new pointer_t(type);
+                state = wait_name;
+                continue;;
+            }
+            status = -7777786;
+            parent_space->CreateError(status, "type not defined", node.line_number);
+            node.Finish();
+            continue;
+        }
 
 		case wait_name:
 			if (node.lexem == lt_mul)
@@ -255,6 +288,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 
 			argument = new farg_t(this->space, type, name); // space->CreateVariable(type, name); // Create argument here
 			arguments.push_back(*argument);
+            const_arg = false;
 			state = wait_type;
 			break;
 

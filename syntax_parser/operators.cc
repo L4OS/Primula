@@ -468,6 +468,24 @@ char namespace_t::TranslateCharacter(SourcePtr source)
     if ( source.value.length() == 2 && source.value[0] == '\\')
         switch (source.value[1])
         {
+        case 'r':
+            ch = '\r';
+            break;
+        case 'n':
+            ch = '\n';
+            break;
+        case 't':
+            ch = '\t';
+            break;
+        case '\\':
+            ch = '\\';
+            break;
+        case '\'':
+            ch = '\'';
+            break;
+        case '\"':
+            ch = '\"';
+            break;
         default:
             CreateError(-7776137, "Unparsed character sequence", source.line_number);
             break;
