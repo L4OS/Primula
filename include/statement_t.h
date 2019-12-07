@@ -2,6 +2,38 @@
 
 #include "lexem.h"
 #include "type_t.h"
+#include <string.h>
+
+class constant_node_t
+{
+public:
+    int				integer_value;
+    float			float_value;
+    const char	*	char_pointer;
+    constant_node_t(char c)
+    {
+        integer_value = c;
+    }
+    constant_node_t(int v)
+    {
+        integer_value = v;
+        float_value = 0;
+        char_pointer = nullptr;
+    }
+    constant_node_t(float v)
+    {
+        integer_value = 0;
+        float_value = v;
+        char_pointer = nullptr;
+    }
+    constant_node_t(const char * v)
+    {
+        integer_value = 0;
+        float_value = 0;
+        char_pointer = new char[1 + strlen(v)];
+        strcpy((char*)char_pointer, v);
+    }
+};
 
 class expression_node_t
 {
@@ -9,15 +41,19 @@ public:
 	type_t					*	type;
 	bool						is_constant;
 	lexem_type_t				lexem;
-//	lexem_type_t				postfix;
 	expression_node_t		*	left;
 	expression_node_t		*	right;
 	class variable_base_t	*	variable;
 	class  call_t			*	call;
-	class constant_node_t	*	constant;
+	constant_node_t	        *	constant;
 
 	expression_node_t(lexem_type_t	lexem);
 	expression_node_t(const expression_node_t * node);
+
+    bool IsConstZero()
+    {
+        return ((lexem == lt_integer) & is_constant) && (constant->integer_value == 0);
+    }
 };
 
 class statement_t
@@ -91,15 +127,18 @@ public:
 	expression_node_t	*	root;
 	bool					is_constant;
 	const type_t		*	type;
-	expression_node_t	*	postfix;
 
 	expression_t(expression_node_t * root) : statement_t(_expression)
 	{
 		this->root = root;
 		is_constant = root->is_constant;
 		type = root->type;
-		postfix = nullptr;
 	}
+
+    bool IsConstZero()
+    {
+        return root != nullptr && root->IsConstZero();
+    }
 };
 
 class call_t : public statement_t
@@ -115,37 +154,6 @@ public:
 		this->name = name;
 		caller = caller_space;
 		code = c;
-	}
-};
-
-class constant_node_t
-{
-public:
-	int				integer_value;
-	float			float_value;
-	const char	*	char_pointer;
-	constant_node_t(char c)
-	{
-		integer_value = c;
-	}
-	constant_node_t(int v)
-	{
-		integer_value = v;
-		float_value = 0;
-		char_pointer = nullptr;
-	}
-	constant_node_t(float v)
-	{
-		integer_value = 0;
-		float_value = v;
-		char_pointer = nullptr;
-	}
-	constant_node_t(const char * v)
-	{
-		integer_value = 0;
-		float_value = 0;
-		char_pointer = new char[1 + strlen(v)];
-		strcpy((char*)char_pointer, v);
 	}
 };
 

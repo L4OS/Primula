@@ -30,7 +30,7 @@ struct function_overload_t
 
 	variable_base_t * FindArgument(std::string name);
 
-	void Parse(namespace_t * parent, Code::statement_list_t * source); // TODO: move to parser space
+	void Parse(int line_num, namespace_t * parent, Code::statement_list_t * source); // TODO: move to parser space
 	Code::statement_list_t		*	source_code;	// For second pass. TODO: move to parser space
 };
 
