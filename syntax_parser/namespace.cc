@@ -51,6 +51,24 @@ type_t	*	namespace_t::GetBuiltinType(lexem_type_t type)
 	return 0;
 }
 
+void namespace_t::CreateError(int linenum, int error, std::string description, ...)
+{
+
+    char buffer[256];
+    va_list args;
+    va_start(args, description);
+    buffer[255] = '\0';
+    vsnprintf(buffer, 254, description.c_str(), args);
+    va_end(args);
+
+    fprintf(stderr, "%d: Error %d: %s\n", linenum, error, buffer);
+    if (this != nullptr)
+        errors.Add(error, buffer, linenum);
+    else
+        throw "Trying to log error into not declared namespace";
+}
+
+
 type_t * namespace_t::TryLexenForType(SourcePtr &source)
 {
 	type_t * type = nullptr;
@@ -97,7 +115,7 @@ int namespace_t::CheckNamespace(SourcePtr &source)
 		if (source.lexem != lt_openblock)
 			return -1;
 	case lt_openblock:
-		current_space = current_space->CreateSpace(namespace_t::spacetype_t::name_space, spacename);
+		current_space = current_space->CreateSpace(spacetype_t::name_space, spacename);
 		// call to parser namesoace's statements
 		for (auto statement : *source.statements)
 		{
@@ -227,7 +245,7 @@ void namespace_t::CheckStorageClass(SourcePtr & source, linkage_t * linkage)
 	if (source != false)
 		if (linkage->storage_class != linkage_t::sc_default)
 		{
-			CreateError(-77777, "storage duplication", source.line_number);
+			CreateError(source.line_number, -77777, "storage duplication");
 		}
 		else
 			switch (source.lexem)
@@ -294,7 +312,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			}
 			else
 			{
-				CreateError(-7777726, "simple type has no namespace", source.line_number);
+				CreateError(source.line_number, -7777726, "type '%s' have no space", name);
 				source.Finish();
 				return;
 			}
@@ -309,7 +327,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		variable = FindVariable(name);
 		if (variable != nullptr && variable->space == this)
 		{
-			CreateError(-77777, "Variable already defined", source.line_number);
+			CreateError(source.line_number, -77777, "Variable '%s' already defined", name.c_str());
 			source.Finish();
 			return;
 		}
@@ -327,16 +345,19 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 				return;
 			}
 			expression_t * assign = ParseExpression(source);
+            if(assign != nullptr)
 			{
-                
                 bool is_zero = assign->is_constant ? 
                     assign->type->prop == type_t::signed_type ?
                     (assign->root->constant->integer_value == 0) : false : false;
 
+                //if (source.line_number == 701)
+                //    printf("debug\n");
+
                 if (CompareTypes(variable->type, assign->type, false, is_zero) == no_cast)
                 {
-                    CreateError(-777776, "Cannot cast %s to %s", source.line_number, 
-                        assign->type->name, variable->type->name);
+                    CreateError(source.line_number, -777776, "Cannot cast %s to %s",
+                        assign->type->name.c_str(), variable->type->name.c_str());
                     return;
                 }
 				variable->declaration = assign;
@@ -352,7 +373,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		source++;
 		if (source == false)
 		{
-			CreateError(-777776, "Broken assignment code", source.line_number);
+			CreateError(source.line_number, -777776, "Broken assignment code");
 			return;
 		}
 		if (source.lexem == lt_openblock)
@@ -363,7 +384,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			case type_t::property_t::pointer_type:
 				throw "todo: parse struct and array initialization";
 			default:
-				CreateError(-777776, "Assignment bloack format error", source.line_number);
+				CreateError(source.line_number, -777776, "Assignment block format error");
 				source.Finish();
 				return;
 			}
@@ -418,7 +439,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                 case lt_enum:
                     break;
                 default:
-                    CreateError(-7777774, "non-terminated function definition", source.line_number);
+                    CreateError(source.line_number, -7777774, "non-terminated function definition" );
                     source.Finish();
                     return;
                 }
@@ -427,7 +448,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		source++;
 		if (source == false)
 		{
-			CreateError(-7777774, "non-terminated function definition", source.line_number);
+			CreateError(source.line_number, -7777774, "non-terminated function definition" );
 			return;
 		}
 
@@ -438,7 +459,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			source++;
 			if (source == false)
 			{
-				CreateError(-7777774, "non-terminated function definition", source.line_number);
+				CreateError(source.line_number, -7777774, "non-terminated function definition");
 				return;
 			}
 		}
@@ -446,17 +467,17 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		{
 			if (this->type == spacetype_t::function_space)
 			{
-				CreateError(-7777774, "function inside function not allowed", source.line_number);
+				CreateError(source.line_number, -7777774, "function inside function not allowed");
 				source.Finish();
 				return;
 			}
 			if (function->space != nullptr)
 			{
-				CreateError(-77777, "Function already defined in current namespace", source.line_number);
+				CreateError(source.line_number, -77777, "Function '%s' already defined in current namespace", name);
 				source.Finish();
 				return;
 			}
-			function->Parse(this, source.statements);
+			function->Parse(source.line_number, this, source.statements);
 			source++;
 			return;
 		}
@@ -480,7 +501,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 					}
 					else
 					{
-						CreateError(-7777414, "Non virtual method marked as abstract", source.line_number);
+						CreateError(source.line_number, -7777414, "Non virtual method '%s' marked as abstract", function->function->name.c_str());
 						source.Finish();
 						break;
 					}
@@ -488,7 +509,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			}
 		}
 	}
-	CreateError(-7777401, "Unaprsed lexem on function definition|declaration", source.line_number);
+	CreateError(source.line_number, -7777401, "Unaprsed lexem on function definition|declaration");
 	source.Finish();
 	break;
 
@@ -497,7 +518,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		variable = FindVariable(name);
 		if (variable != nullptr && variable->space == this)
 		{
-			CreateError(-7777400, "Variable already defined", source.line_number);
+			CreateError(source.line_number, -7777400, "Variable '%s' already defined", name.c_str());
 			source.Finish();
 			return;
 		}
@@ -512,13 +533,13 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 				expression_t * expr = ParseExpression(SourcePtr(source.sequence));
 				if (expr == nullptr)
 				{
-					CreateError(-777743, "broken expression in array definition", source.line_number);
+					CreateError(source.line_number, -777743, "broken expression in array definition" );
 					source.Finish();
 					return;
 				}
 				if (!expr->is_constant)
 				{
-					CreateError(-777745, "dimension size is not constant", source.line_number);
+					CreateError(source.line_number, -777745, "dimension size is not constant");
 					source.Finish();
 					return;
 				}
@@ -534,7 +555,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 	case lt_colon:
 		if (++source == false || source.lexem != lt_integer)
 		{
-			CreateError(-7777914, "Expected field bitsize", source.line_number, source.lexem);
+			CreateError(source.line_number, -7777914, "Expected field size in bits");
 			source.Finish();
 			return;
 		}
@@ -544,7 +565,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			type->bitsize = field_size;
 			if (++source == false || source.lexem != lt_semicolon)
 			{
-				CreateError(-7777914, "Bad termination of class|struct field definition", source.line_number, source.lexem);
+				CreateError(source.line_number, -7777914, "Bad termination lexem (%d) of class|struct field definition", source.lexem);
 				source.Finish();
 				return;
 			}
@@ -553,7 +574,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		return;
 
 	default:
-		CreateError(-7777774, "Unparsed lexem '%d' on selection state in statement parser", source.line_number, source.lexem);
+		CreateError(source.line_number, -7777774, "Unparsed lexem (%d) on selection state in statement parser", source.lexem);
 		source.Finish();
 	}
 }
@@ -589,7 +610,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 	{
 		if (debug_line == source.line_number)
 		{
-			CreateError(0, "Statement Breakpoint", source.line_number);
+			CreateError(source.line_number, 0, "Statement Breakpoint");
 		}
 		switch (state)
 		{
@@ -603,7 +624,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			continue;
 
 		case finish_state:
-			CreateError(-777778, "Lexem below statement terminator", source.line_number);
+			CreateError(source.line_number, -777778, "Lexeme ('%d') after statement terminator", source.lexem);
 			source.Finish();
 			continue;
 
@@ -617,14 +638,14 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					structure->space->ParseStatement(++source);
 					continue;
 				}
-				CreateError(-777778, "Type is not structrue. But maybe not error", source.line_number);
+				CreateError(source.line_number, -777778, "Type '%s' is not structrued. But maybe not error", type->name.c_str());
 				source.Finish();
 				continue;
 
 			case lt_semicolon:
 				if (type->prop != type_t::property_t::compound_type)
 				{
-					CreateError(-7777774, "stament not define anything", source.line_number);
+					CreateError(source.line_number, -7777774, "stament not define anything");
 					source.Finish();
 					continue;
 				}
@@ -657,7 +678,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			{
 				if (this->type != spacetype_t::structure_space)
 				{
-					CreateError(-7777774, "function inside function not allowed", source.line_number);
+					CreateError(source.line_number, -7777774, "function inside function not allowed");
 					source.Finish();
 					continue;
 				}
@@ -679,7 +700,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						}
 						if (source != false)
 						{
-							CreateError(-7777074, "wrong declaration of constructor", source.line_number);
+							CreateError(source.line_number, -7777074, "wrong declaration of constructor");
 							source.Finish();
 						}
 						continue;
@@ -720,7 +741,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						if (t->prop == type_t::pointer_type)
 						{
 							pointer_t	*	parent = (pointer_t*)t;
-							fprintf(stderr, "Catch typetype\n");
+							//fprintf(stderr, "Catch typetype\n");
 							parent->parent_type = f->function->type;
 						}
 					}
@@ -740,7 +761,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					continue;
 					
 				default:
-					CreateError(-7777074, "wrong declaration of constructor", source.line_number);
+					CreateError(source.line_number, -7777074, "wrong declaration of constructor");
 					source.Finish();
 					continue;
 				}
@@ -763,7 +784,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			{
 				if (source.previous_lexem != lt_struct && source.previous_lexem != lt_class)
 				{
-					CreateError(-7771393, "inheritance allowed only for classes and structures", source.line_number);
+					CreateError(source.line_number, -7771393, "inheritance allowed only for classes and structures");
 					source.Finish();
 					continue;
 				}
@@ -771,7 +792,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				source++;
 				if (source == false || source.lexem != lt_word)
 				{
-					CreateError(-7771393, "syntax error on type inheritance", source.line_number);
+					CreateError(source.line_number, -7771393, "syntax error on type inheritance");
 					source.Finish();
 					continue;
 				}
@@ -780,13 +801,13 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					structure_t * parent_type = (structure_t*) this->FindType(source.value);
 					if (parent_type == nullptr)
 					{
-						CreateError(-7771393, "parent type not found", source.line_number);
+						CreateError(source.line_number, -7771393, "parent type not found");
 						source.Finish();
 						continue;
 					}
 					if (parent_type->prop != parent_type->compound_type)
 					{
-						CreateError(-7771393, "parent type is not compound", source.line_number);
+						CreateError(source.line_number, -7771393, "parent type '%s' is not compound", parent_type->name.c_str());
 						source.Finish();
 						continue;
 					}
@@ -795,7 +816,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					source++;
 					if (source != true)
 					{
-						CreateError(-7771393, "non-termiated inheritance", source.line_number);
+						CreateError(source.line_number, -7771393, "non-termiated inheritance");
 						continue;
 					}
 					if (source.lexem == lt_openblock)
@@ -806,7 +827,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					}
 					if(source.lexem != lt_comma)
 					{
-						CreateError(-7771393, "wrong delimiter", source.line_number);
+						CreateError(source.line_number, -7771393, "wrong delimiter (%d)", source.lexem);
 						source.Finish();
 						continue;
 					}
@@ -840,13 +861,13 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				source++;
 				if (source == false)
 				{
-					CreateError(-7775312, "no data found for declaration", source.line_number);
+					CreateError(source.line_number, -7775312, "no data found for assignment|declaration");
 					continue;
 				}
 				variable = FindVariable(name);
 				if (variable == nullptr)
 				{
-					CreateError(-7777777, "internal syntax parser error", source.line_number);
+					CreateError(source.line_number, -7777777, "internal syntax parser error");
 					source.Finish();
 					continue;
 				}
@@ -869,7 +890,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					}
 					else if (type_count < real_count)
 					{
-						CreateError(-7779007, "too many initializer for array", source.line_number);
+						CreateError(source.line_number, -7779007, "too many initializer [%d] for array[%d]", real_count, type_count);
 						source.Finish();
 						continue;
 					}
@@ -944,7 +965,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				type = TryLexenForType(source);
 				if (type == nullptr)
 				{
-					CreateError(-777745, "destructor on non-compound type not implemented", source.line_number);
+					CreateError(source.line_number, -777745, "destructor on non-compound type '%s' not implemented", type->name.c_str());
 					source.Finish();
 					continue;
 				}
@@ -972,7 +993,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			case lt_tilde:
 				if (this->type != structure_space)
 				{
-					CreateError(-777745, "destructor on non-compound type not implemented", source.line_number);
+					CreateError(source.line_number, -777745, "destructor on non-compound type not implemented");
 					source.Finish();
 					continue;
 				}
@@ -992,7 +1013,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				// add expressiob to list
 				//
 				this->space_code.push_back(code);
-				if (source != false && source != lt_semicolon)
+				if (source != false && source.lexem != lt_semicolon)
 				{
 					fprintf(stderr, "Skip something\n");
 					source.Finish();
@@ -1034,7 +1055,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 
 				if (linkage.storage_class != linkage_t::storage_class_t::sc_default)
 				{
-					CreateError(-777745, "type expected for variable declaration", source.line_number);
+					CreateError(source.line_number, -777745, "type expected for variable declaration (%s)", source.value.c_str());
 #if true  // true for C-ctyle, false for C++ style
 					type = GetBuiltinType(lt_type_int);
                     comma_type = type;  // Will not used for such case?
@@ -1067,10 +1088,11 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				function = FindTemplateFunction(source.value);
 				if (function != nullptr)
 				{
+                    name = function->name;
 					source++;
 					if(source == false)
 					{
-						CreateError(-7775132, "Non terminated statement", source.line_number);
+						CreateError(source.line_number, -7775132, "Non terminated statement");
 						continue;
 					}
 					if (source.lexem == lt_openbraket)
@@ -1078,7 +1100,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						function = FindFunction(function->name);
 						if (function == nullptr)
 						{
-							CreateError(-7775132, "Not found instance of templated function", source.line_number);
+							CreateError(source.line_number, -7775132, "Not found instance of templated function '%s'", name.c_str());
 							source.Finish();
 							continue;
 						}
@@ -1098,7 +1120,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 							continue;
 						}
 					}
-					CreateError(-7775132, "Unparsed lexeme in namespace_t::ParseStatement(SourcePtr &source)", source.line_number);
+					CreateError(source.line_number, -7775132, "Unparsed lexeme (%d) in namespace_t::ParseStatement(SourcePtr &source)", source.lexem);
 					source.Finish();
 					continue;
 				}
@@ -1130,7 +1152,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						}
 						else
 						{
-							CreateError(-7775132, "Unparsed word in namespace_t::ParseStatement(SourcePtr &source)", source.line_number);
+							CreateError(source.line_number, -7775132, "Unparsed word in namespace_t::ParseStatement(SourcePtr &source)");
 							source.Finish();
 						}
 					}
@@ -1150,7 +1172,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						continue;
 					}
 				}
-				CreateError(-7776732, "identifier '%s' not found", source.line_number, source.value.c_str());
+				CreateError(source.line_number, -7776732, "identifier '%s' not found", source.value.c_str());
 //				__debugbreak();
 				break;
 
@@ -1174,7 +1196,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					}
 					else
 					{
-						CreateError(-7777732, "operators allowed only within functions", source.line_number);
+						CreateError(source.line_number, -7777732, "operators allowed only within functions");
 						source.Finish();
 						continue;
 					}
@@ -1225,7 +1247,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 		case wait_delimiter_state:
 			if (source.lexem != lt_semicolon)
 			{
-				CreateError(-777715, "wrong delimiter", source.line_number);
+				CreateError(source.line_number, -777715, "wrong delimiter (%d)", source.lexem);
 				source.Finish();
 				continue;
 			}
@@ -1237,7 +1259,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 		case visibility_colon:
 			if (source.lexem != lt_colon)
 			{
-				CreateError(-777715, "wrong delimiter", source.line_number);
+				CreateError(source.line_number, -777715, "wrong delimiter (%d)", source.lexem);
 				source.Finish();
 				continue;
 			}

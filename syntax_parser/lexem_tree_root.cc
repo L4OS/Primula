@@ -1,5 +1,7 @@
 #include "../include/lexem.h"
 #include "lexem_tree_root.h"
+#include "../include/type_t.h"
+#include <stdio.h>
 
 class CodeSplitter : public Code
 {
@@ -21,7 +23,8 @@ class CodeSplitter : public Code
 		statement_list_t::iterator	prev = statement_eof;
 		lexem_list_t	*	fix = nullptr;
 		bool last_result = false;
-		while (statement_src != statement_eof)
+        bool    fix_dowhile = false;
+        while (statement_src != statement_eof)
 		{
 
 			lexem_list_t::iterator  node = statement_src->begin();
@@ -46,6 +49,18 @@ class CodeSplitter : public Code
 				switch (node->lexem)
 				{
 				case lt_do:
+                    check_block = true;
+                    fix_dowhile = true;
+                    fix = &*statement_src;
+                    break;
+
+                case lt_while:
+                    if (fix_dowhile)
+                    {
+                        fix_dowhile = false;
+                    }
+                    break;
+
 				case lt_struct:
 				case lt_union:
 				case lt_enum:
@@ -61,6 +76,7 @@ class CodeSplitter : public Code
 					{
 						fix = &*statement_src;
 						check_block = false;
+                        fix_dowhile = false;
 					}
 					break;
 

@@ -66,7 +66,7 @@ static bool TryRegisterEnumeration(namespace_t * space, std::string name, int va
 	}
 	else
 	{
-		space->CreateError(-7777789, "%s redefinition", line_number, name.c_str());
+		space->CreateError(line_number, -7777789, "%s redefinition", name.c_str());
 	}
 	return success;
 }
@@ -94,7 +94,7 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 			case check_name_state:
 				if (item.lexem != lt_word)
 				{
-					CreateError(-7777789, "wrong enumeration item name", item.line_number);
+					CreateError(item.line_number, -7777789, "wrong enumeration item name");
 					return result;
 				}
 				item_name = item.value;
@@ -111,7 +111,7 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 				}
 				if (item.lexem != lt_comma)
 				{
-					CreateError(-7777789, "expected comma", item.line_number);
+					CreateError(item.line_number, -7777789, "expected comma");
 					return result;
 				}
 				bool success = TryRegisterEnumeration(this, item_name, item_index, item.line_number);
@@ -141,7 +141,7 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 					continue;
 				}
 			on_error:
-				CreateError(-7777689, "assign expression to enumerated item value not implemented", item.line_number);
+				CreateError(item.line_number, -7777689, "assign expression to enumerated item value not implemented");
 				return result;
 
 			case negative_value_state:

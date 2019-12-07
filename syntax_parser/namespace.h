@@ -3,6 +3,7 @@
 #include <string>
 #include <list>
 #include <map>
+#include <stdio.h>
 #include <stdarg.h>
 
 #include "../include/lexem.h"
@@ -32,7 +33,7 @@ public:
     std::map<std::string, type_t*>                  template_types_map;
 
     static type_t  builtin_types[18];
-    bool no_parse_methods_body = false;
+    bool no_parse_methods_body; // = false; // An old g++ does not allow such initialization
     std::map<std::string, type_t*>	instance_types;
 
 public:
@@ -40,23 +41,10 @@ public:
 	{
 		this->parent = nullptr;
 		this->type = global_space;
-	}
+        this->no_parse_methods_body = false;
+    }
 
-	void CreateError(int error, std::string description, int linenum, ...)
-	{
-
-		char buffer[256];
-		va_list args;
-		va_start(args, linenum);
-		vsnprintf(buffer, 256, description.c_str(), args);
-		va_end(args);
-		
-		fprintf(stderr, "%d: Error %d: %s\n", linenum, error, buffer);
-		if (this != nullptr)
-			errors.Add(error, buffer, linenum);
-		else
-			throw "Trying to log error into not declared namespace";
-	}
+    void CreateError(int linenum, int error, std::string description, ...);
 
 	namespace_t * CreateSpace(spacetype_t type, std::string name)
 	{
@@ -95,49 +83,54 @@ public:
 	type_t			* ParseEnumeration(std::string parent_name, Code::statement_list_t *	statements);
 	static_data_t	* BraceEncodedInitialization(type_t * type, SourcePtr & source);
     static_data_t   * BraceEncodedStructureInitialization(structure_t * structure, Code::statement_list_t * encoded_data);
-    static_data_t   * ÑheckLexemeData(type_t * type, Code::lexem_node_t * node);
+    static_data_t   * CheckLexemeData(type_t * type, Code::lexem_node_t * node);
     static_data_t   * TryEnumsAndConstants(type_t * type, Code::lexem_node_t * node);
 
 	namespace_t * findBreakableSpace(bool continues);
 	namespace_t * findContinuableSpace();
 
-	int namespace_t::CheckNamespace(SourcePtr &source);
-	expression_t  * namespace_t::ParseExpression(SourcePtr &source);
-	expression_t  * namespace_t::ParseExpressionExtended(SourcePtr &lexem, type_t ** ptype, bool hide);
-	statement_t * namespace_t::CheckOperator_IF(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_DO(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_WHILE(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_BREAK(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_CONTINUE(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_DEFAULT(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_OPERATOR(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_GOTO(SourcePtr & source);
-	statement_t * namespace_t::CheckOperator_DELETE(SourcePtr & source);
-	statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source);
-	statement_t * namespace_t::CheckOperator_THROW(SourcePtr &source);
-
-	statement_t *  namespace_t::CheckOperators(SourcePtr &source);
+    // An old g++ does not like namaspace qualification in compound defintion. 
+    // TODO: Move some qualification in test - we must support these qualifications
+    // keep following line until new test will created
+	//
+    // int namespace_t::CheckNamespace(SourcePtr &source);
+    //
+    int CheckNamespace(SourcePtr &source);
+    expression_t  * ParseExpression(SourcePtr &source);
+	expression_t  * ParseExpressionExtended(SourcePtr &lexem, type_t ** ptype, bool hide);
+	statement_t   * CheckOperator_IF(SourcePtr &source);
+	statement_t   * CheckOperator_RETURN(SourcePtr &source);
+	statement_t   * CheckOperator_DO(SourcePtr &source);
+	statement_t   * CheckOperator_WHILE(SourcePtr &source);
+	statement_t   * CheckOperator_SWITCH(SourcePtr &source);
+	statement_t   * CheckOperator_FOR(SourcePtr &source);
+	statement_t   * CheckOperator_BREAK(SourcePtr &source);
+	statement_t   * CheckOperator_CASE(SourcePtr &source);
+	statement_t   * CheckOperator_CONTINUE(SourcePtr &source);
+	statement_t   * CheckOperator_DEFAULT(SourcePtr &source);
+	statement_t   * CheckOperator_OPERATOR(SourcePtr &source);
+	statement_t   * CheckOperator_GOTO(SourcePtr & source);
+	statement_t   * CheckOperator_DELETE(SourcePtr & source);
+	statement_t   * CheckOperator_TRY(SourcePtr &source);
+	statement_t   * CheckOperator_THROW(SourcePtr &source);
+	statement_t   * CheckOperators(SourcePtr &source);
 	statement_t * CreateStatement(SourcePtr &source, spacetype_t soace_type);
-	int namespace_t::Parse(Code::statement_list_t source);
-	void namespace_t::ParseTemplate(SourcePtr & source);
-	type_t * namespace_t::TryTranslateType(type_t * type);
-	function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func, SourcePtr & source);
-	function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, int line_number);
-	variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t * linkage, SourcePtr & source);
-	void namespace_t::TranslateNamespace(namespace_t * space, int line_num);
-	variable_base_t *  namespace_t::TranslateVariable(namespace_t * space, variable_base_t * var);
-	expression_t * namespace_t::TranslateExpression(namespace_t * space, expression_t * exp);
+	int Parse(Code::statement_list_t source);
+	void ParseTemplate(SourcePtr & source);
+	type_t * TryTranslateType(type_t * type);
+	function_parser	* CreateFunctionFromTemplate(function_parser * func, SourcePtr & source);
+	function_parser	* CreateFunctionInstance(function_parser * func, int line_number);
+	variable_base_t * CreateObjectFromTemplate(type_t * type, linkage_t * linkage, SourcePtr & source);
+	void TranslateNamespace(namespace_t * space, int line_num);
+	variable_base_t *  TranslateVariable(namespace_t * space, variable_base_t * var);
+	expression_t * TranslateExpression(namespace_t * space, expression_t * exp);
     char TranslateCharacter(SourcePtr source);
 
 private:
-	void namespace_t::CheckStorageClass(SourcePtr & source, linkage_t * linkage);
-	void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::string name, SourcePtr & source);
-	type_t * namespace_t::TypeDefOpenBraket(SourcePtr & source, std::string & name, type_t * type);
-	type_t * namespace_t::ParseIndex(SourcePtr & source, type_t * type);
+	void CheckStorageClass(SourcePtr & source, linkage_t * linkage);
+	void SelectStatement(type_t * type, linkage_t * linkage, std::string name, SourcePtr & source);
+	type_t * TypeDefOpenBraket(SourcePtr & source, std::string & name, type_t * type);
+	type_t * ParseIndex(SourcePtr & source, type_t * type);
 	//inline template_t * namespace_t::CreateTemplateType(std::string type_name);
 
 //	friend class function_overload_parser;

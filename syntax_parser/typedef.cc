@@ -20,7 +20,7 @@ type_t * namespace_t::TypeDefOpenBraket(SourcePtr & source, std::string & name, 
 	case lt_word:
 		if (!name.empty())
 		{
-			CreateError(-7777739, "Structure error in typedef", source.line_number);
+			CreateError(source.line_number, -7777739, "Structure error in typedef");
 			source.Finish();
 			return nullptr;
 		}
@@ -62,7 +62,7 @@ type_t * namespace_t::ParseIndex(SourcePtr & source, type_t * type)
 		}
 		else
 		{
-			CreateError(-777414, "typedef: array size must be constant value", source.line_number);
+			CreateError(source.line_number, -777414, "typedef: array size must be constant value");
 			source.Finish();
 			return nullptr;
 		}
@@ -118,7 +118,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				type = TryLexenForType(source);
 				if (type == nullptr)
 				{
-					CreateError(-7777738, "Unparsed typedef construction", source.line_number);
+					CreateError(source.line_number, -7777738, "Unparsed typedef construction (%s)", source.value);
 					source.Finish();
 					continue;
 				}
@@ -130,7 +130,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				type = GetBuiltinType(source.lexem);
 				if (type == nullptr)
 				{
-					CreateError(-7777738, "Unparsed typedef construction", source.line_number);
+					CreateError(source.line_number, -7777738, "Unparsed lexem in parsing typedef " );
 					source.Finish();
 					continue;
 				}
@@ -142,14 +142,14 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 		case typedef_struct_state:
 			if (source.lexem != lt_openblock)
 			{
-				CreateError(-7777739, "Structure error in typedef", source.line_number);
+				CreateError(source.line_number, -7777739, "structure definition error in typedef" );
 				source.Finish();
 				continue;
 			}
 			type = ParseCompoundDefinition(def_name, compound_mode, source.statements);
 			if (type == nullptr)
 			{
-				CreateError(-7777434, "Structure error in typedef", source.line_number);
+				CreateError(source.line_number, -7777434, "structure defintion error in typedef" );
 				source.Finish();
 				continue;
 			}
@@ -185,7 +185,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				state = finish_typedef_state;
 				break;
 			default:
-				CreateError(-777714, "typedef: typename expected", source.line_number);
+				CreateError(source.line_number, -777714, "typedef: typename expected");
 				source.Finish();
 				continue;
 			}
@@ -204,7 +204,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 			{
 				if (type != nullptr)
 				{
-					CreateError(-777414, "typedef: typename already defined", source.line_number);
+					CreateError(source.line_number, -777414, "typedef: type '%s' already defined", def_name.c_str());
 					source.Finish();
 					continue;
 				}
@@ -217,7 +217,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 			}
 			if (type == nullptr)
 			{
-				CreateError(-777414, "typedef: enuneration error", source.line_number);
+				CreateError(source.line_number, -777414, "typedef: enuneration definition error");
 				source.Finish();
 				continue;
 			}
@@ -228,7 +228,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 			}
 			if (source == false && source.lexem != lt_word)
 			{
-				CreateError(-777414, "typedef: expected enuneration type name", source.line_number);
+				CreateError(source.line_number, -777414, "typedef: expected enuneration type name");
 				source.Finish();
 				continue;
 			}
@@ -236,7 +236,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 			source++;
 			if (source == false)
 			{
-				CreateError(-777414, "typedef: expected delimiter of union", source.line_number);
+				CreateError(source.line_number, -777414, "typedef: expected delimiter of union");
 				source.Finish();
 				continue;
 			}
@@ -265,7 +265,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 			{
 				if (this->FindType(name) != nullptr)
 				{
-					this->CreateError(-7770320, "type already defined\n", source.line_number);
+					this->CreateError(source.line_number, -7770320, "type '%s' already defined", name.c_str());
 					source.Finish();
 					continue;
 				}
@@ -284,7 +284,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 					type_t * t = typetype;
 					if (typetype->prop == type_t::auto_type)
 					{
-						printf("Catch typetype\n");
+						fprintf(stderr, "Catch typetype\n");
 						typetype = function_ptr;
 					}
 					while (t->prop == type_t::pointer_type)
@@ -296,7 +296,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 					}
 					if (t->prop == type_t::pointer_type)
 					{
-						printf("Catch typetype\n");
+						fprintf(stderr, "Catch typetype\n");
 						//pointer_t	*	parent = (pointer_t*)t;
 						//parent->parent_type = function_ptr;
 						typetype = function_ptr;
@@ -323,7 +323,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				continue;
 			}
 
-			CreateError(-777315, "typedef: delimiter expected", source.line_number);
+			CreateError(source.line_number, -777315, "typedef: delimiter expected");
 			source.Finish();
 			continue;
 
@@ -334,7 +334,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				source++;
 				continue;
 			}
-			CreateError(-777315, "typedef: unexpected lexem instead of semicolon ar typedef paring", source.line_number);
+			CreateError(source.line_number, -777315, "typedef: unexpected lexem instead of semicolon ar typedef paring");
 			source.Finish();
 			continue;
 

@@ -2,10 +2,10 @@
 #include "../include/statement_t.h"
 #include "namespace.h"
 
-void function_overload_t::Parse(namespace_t * parent, Code::statement_list_t * source)
+void function_overload_t::Parse(int line_num, namespace_t * parent, Code::statement_list_t * source)
 {
 	if (this->space != nullptr)
-		parent->CreateError(-7777721, "Function already defined", -1);
+		parent->CreateError(line_num, -7777721, "Function '%s' already defined", (function->name + this->mangle).c_str());
 
 	this->space = new namespace_t(parent, namespace_t::function_space, function->name + this->mangle);
 	this->space->owner_function = this;
@@ -82,7 +82,9 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 	Code::statement_list_t args;
 	SplitFunctionArguments(args_sequence, &args);
 
-	call_t	* result = new call_t(this->space  /* Not sure about THIS space */, function->name + mangle, this);
+    std::string mangled_name = function->name + mangle;
+
+	call_t	* result = new call_t(this->space  /* Not sure about THIS space */, mangled_name, this);
 
 	Code::statement_list_t::iterator	arg = args.begin();
 	arg_list_t::iterator				arg_proto = arguments.begin();
@@ -99,7 +101,7 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 			if (arg_proto == arguments.end() )
 			{
 				// Check arguments overflow
-				space->CreateError(-7777721, "too many arguments for function", arg->begin()->line_number);
+				space->CreateError(arg->begin()->line_number, -7777721, "too many arguments for function '%s'", mangled_name.c_str());
 				return nullptr;
 			}
 		}
@@ -108,7 +110,7 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 		expression_t * expr = space->ParseExpression(arg_ptr);
 		if (expr == nullptr)
 		{
-			space->CreateError(-7777722, "function argument format error", arg_ptr.line_number);
+			space->CreateError(arg_ptr.line_number , -7777722, "call function '%s' - argument format error", mangled_name.c_str());
 			return nullptr;
 		}
 
@@ -116,14 +118,14 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 		{
 			if (arg_proto->type != expr->type)
 			{
-				space->CreateError(-7777722, "function argument type mismatch", arg_ptr.line_number);
+				space->CreateError(arg_ptr.line_number, -7777722, "function '%s' argument type mismatch", mangled_name.c_str());
 				return nullptr;
 			}
 			// add argument to caller
 		}
 
 		arg++;
-		if (arg_proto->type != 0) // ÃÃ¬Ã³Ã«Ã¿Ã¶Ã¨Ã¿ Ã¬Ã­Ã®Ã£Ã®Ã²Ã®Ã·Ã¨Ã¿
+		if (arg_proto->type != 0) // Ýìóëÿöèÿ ìíîãîòî÷èÿ
 			arg_proto++;
 	}
 
@@ -194,7 +196,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
                         continue;
                     default:
                         status = -7777786;
-                        parent_space->CreateError(status, "argument's type expected", node.line_number);
+                        parent_space->CreateError(node.line_number, status, "argument's type expected");
                         node.Finish();
                         continue;
                     }
@@ -220,7 +222,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
                 continue;;
             }
             status = -7777786;
-            parent_space->CreateError(status, "type not defined", node.line_number);
+            parent_space->CreateError(node.line_number, status, "type not defined");  // Name of type?
             node.Finish();
             continue;
         }
@@ -252,7 +254,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			if (node.lexem != lt_word)
 			{
 				status = -7777701;
-				space->CreateError(status, "parser expected name at function_parser::ParseArgunentDefinition", node.line_number);
+				space->CreateError(node.line_number, status, "parser expected name at function_parser::ParseArgunentDefinition");
 				node.Finish();
 				continue;
 			}
@@ -266,7 +268,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 				if (node.sequence->size() > 0)
 				{
 					status = -7777702;
-					space->CreateError(status, "array cannot be a functions' agument", node.line_number);
+					space->CreateError(node.line_number, status, "array cannot be a functions' agument");
 					node.Finish();
 					continue;
 				}
@@ -281,7 +283,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			if (node.lexem != lt_comma)
 			{
 				status = -7777701;
-				space->CreateError(status, "parser expected delimiter at function_parser::ParseArgunentDefinition", node.line_number);
+				space->CreateError(node.line_number, status, "parser expected delimiter at function_parser::ParseArgunentDefinition");
 				node.Finish();
 				continue;
 			}
@@ -294,7 +296,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 
 		case got_three_dots:
 			status = -7777701;
-			space->CreateError(status, "close bracket expected", node.line_number);
+			space->CreateError(node.line_number, status, "close bracket expected" );
 			node.Finish();
 			continue;
 
@@ -324,7 +326,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			if (arguments.size() != 0)
 			{
 				status = -7770701;
-				space->CreateError(status, "void argument mixed with others", source.line_number);
+				space->CreateError(source.line_number, status, "plain void argument mixed with others");
 			}
 		}
 	}
@@ -394,7 +396,7 @@ void function_parser::FindBestFunctionOverload(call_t * call)
 				// We found "..."
 				break;
 			}
-			bool zero_rval = false; 
+			bool zero_rval = arg->IsConstZero(); 
 			if (CompareTypes(proto, type, true, zero_rval) != no_cast)
 			{
 				arg_proto++;
@@ -417,7 +419,7 @@ void function_parser::FindBestFunctionOverload(call_t * call)
 	}
 	else
 	{
-		call->caller->CreateError(-7778899, "Unabke found calling function %s with requested set of arguments\n", -1, this->name.c_str());
+		call->caller->CreateError(-1, -7778899, "Unable found calling function %s with requested set of arguments\n", this->name.c_str());
 	}
 }
 
@@ -445,7 +447,7 @@ call_t * function_parser::TryCallFunction(namespace_t * space, SourcePtr & arg_l
 			break;
 		default:
 			if (arg_list == true)
-				space->CreateError(-77712983, "Unparsed lexem '%d' function call in arguments", arg_list.line_number, arg_list.lexem);
+				space->CreateError(arg_list.line_number, -77712983, "Unparsed lexem '%d' function call in arguments", arg_list.lexem);
 			break;
 		} 
 	}

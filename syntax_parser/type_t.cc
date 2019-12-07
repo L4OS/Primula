@@ -34,17 +34,22 @@ compare_t  CompareTypes(
 
 	if (ltype->prop == rtype->prop)
 	{
-		if (lconst == true && rconst == false)
-			return arg_mode ? cast_type : no_cast; // Due to const
+		if (!arg_mode && lconst == true && rconst == false)
+			return no_cast; // Due to const
 
 		switch (ltype->prop)
 		{
 		case type_t::pointer_type:
-			if (zero_rvalue)
-			{
-				return same_types; // Maybe cast_type here for zero pointer?
-			}
-			return CompareTypes(((pointer_t*)ltype)->parent_type, ((pointer_t*)rtype)->parent_type, arg_mode, false);
+        {
+            if (zero_rvalue)
+            {
+                return same_types; // Maybe cast_type here for zero pointer?
+            }
+            type_t * prt = ((pointer_t*)ltype)->parent_type;
+            if (prt->prop == type_t::void_type)
+                return cast_type;
+            return CompareTypes(prt, ((pointer_t*)rtype)->parent_type, true, false);
+        }
 
 		case type_t::compound_type:
 		case type_t::enumerated_type:
@@ -83,8 +88,9 @@ compare_t  CompareTypes(
         {
             if (ptr_to->prop == type_t::void_type)
                 return same_types;
-            return CompareTypes(ptr_to, ((array_t*)rtype)->child_type, arg_mode, false);
+            return CompareTypes(ptr_to, ((array_t*)rtype)->child_type, true, false);
         }
+        return no_cast;
 	}
 	throw "TODO Finish type comparasion";
 }

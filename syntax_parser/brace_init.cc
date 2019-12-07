@@ -168,12 +168,12 @@ static_data_t * namespace_t::TryEnumsAndConstants(type_t * type, Code::lexem_nod
             expr = this->TryEnumeration(node->value);
             if (expr == nullptr)
             {
-                this->CreateError(-77778327, "enumeration '%s' not defined", node->line_number, node->value);
+                this->CreateError(node->line_number, -77778327, "enumeration '%s' not defined", node->value);
                 return nullptr;
             }
             if (!expr->is_constant)
             {
-                this->CreateError(-77778327, "enumeration '%s' must be constant", node->line_number, node->value);
+                this->CreateError(node->line_number, -77778327, "enumeration '%s' must be constant", node->value);
                 return nullptr;
             }
             return new static_data_t( expr->constant->integer_value );
@@ -194,7 +194,7 @@ static_data_t * namespace_t::TryEnumsAndConstants(type_t * type, Code::lexem_nod
     return nullptr;
 }
 
-static_data_t * namespace_t::ÑheckLexemeData(type_t * type, Code::lexem_node_t * node)
+static_data_t * namespace_t::CheckLexemeData(type_t * type, Code::lexem_node_t * node)
 {
     static_data_t * ok = nullptr;
     switch (node->lexem)
@@ -233,7 +233,7 @@ static_data_t * namespace_t::ÑheckLexemeData(type_t * type, Code::lexem_node_t *
                 {
                     if (lexem.lexem == lt_comma)
                         continue;
-                    static_data_t * res = ÑheckLexemeData(array->child_type, new Code::lexem_node_t(lexem));
+                    static_data_t * res = CheckLexemeData(array->child_type, new Code::lexem_node_t(lexem));
                     (*ok->nested).push_back(res);
                 }
             }
@@ -242,7 +242,7 @@ static_data_t * namespace_t::ÑheckLexemeData(type_t * type, Code::lexem_node_t *
         case type_t::property_t::typedef_type:
         {
             typedef_t * def = (typedef_t*)type;
-            ok = ÑheckLexemeData(def->type, node);
+            ok = CheckLexemeData(def->type, node);
             break;
         }
 
@@ -271,7 +271,7 @@ static_data_t * namespace_t::BraceEncodedStructureInitialization(structure_t * s
                 var++;
                 continue;
             default:
-                static_data_t * res = ÑheckLexemeData((*var)->type, &sequence);
+                static_data_t * res = CheckLexemeData((*var)->type, &sequence);
                 (*ok->nested).push_back(res);
                 continue;
             }
@@ -323,12 +323,37 @@ static_data_t *  namespace_t::BraceEncodedInitialization(type_t * type, SourcePt
             type = ((typedef_t*)type)->type;
             continue;
         }
+        case type_t::pointer_type:
+        {
+#if true
+            Code::lexem_node_t  node;
+            node.lexem = source.lexem;
+            node.line_number = source.line_number;
+            node.value = source.value.c_str();
+            static_data_t * res = CheckLexemeData(type, &node);
+            source++;
+            return res;
+#else
+            type = ((pointer_t*)type)->parent_type;
+            if (source.lexem == lt_string)
+            {
+                while (type->prop == type_t::constant_type)
+                    type = ((const_t*)type)->parent_type;
+                if (type->prop == type_t::typedef_type && type->bitsize == 8)
+                {
+                }
+            }
+            else
+                throw "Fix namespace_t::BraceEncodedInitialization";
+#endif
+            continue;
+        }
         case type_t::compound_type:
         {
             structure_t * structure = (structure_t*)type;
             if (structure->kind == lt_class)
             {
-                CreateError(-7777716, "Brace-enclosed initialization (!allowed|!implemented) for classes", source.line_number);
+                CreateError(source.line_number , -7777716, "Brace-enclosed initialization (!allowed|!implemented) for classes");
                 source.Finish();
                 return nullptr;
             }

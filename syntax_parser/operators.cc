@@ -7,7 +7,7 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 	{
 		if (owner_function->function->bitsize != 0)
 		{
-			CreateError(-7777795, "non void function must return value", source.line_number);
+			CreateError(source.line_number, -7777795, "non void function '%s' must return value", owner_function->function->name.c_str());
 			return nullptr;
 		}
 		++source;
@@ -39,12 +39,12 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 			expression_t * expression = ParseExpression(source);
 			if (expression == nullptr)
 			{
-				CreateError(-7777000, "Internal error on parsing expression", source.line_number);
+				CreateError(source.line_number, -7777000, "Internal error on parsing expression");
 				return nullptr;
 			}
 			if (source == false)
 			{
-				CreateError(-7777000, "semicolon expected after return expression", source.line_number);
+				CreateError(source.line_number, -7777000, "semicolon expected after return expression" );
 				return nullptr;
 			}
 
@@ -69,7 +69,9 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 				fprintf(stderr, "Add casting to an expression\n");
 				break;
 			case no_cast:		// r-value type cannot be casted to l-value type
-				CreateError(-7777000, "function return argument type does not match to function type", source.line_number);
+				CreateError(source.line_number, -7777000, "function return argument type '%s' does not match to function type '%s'", 
+                    owner_function->function->type->name.c_str(), 
+                    expression->type->name.c_str());
 				source.Finish();
 			}
 			statement = new return_t;
@@ -108,7 +110,7 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 			result = ParseExpression(source);
 			break;
 		}
-        CreateError(-7777795, "'%s' not defined ", source.line_number, source.value.c_str());
+        CreateError(source.line_number, -7777795, "'%s' not defined ", source.value.c_str());
         source.Finish();
         break;
 
@@ -116,7 +118,7 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 		result = CheckOperators(source);
 		if (result == nullptr)
 		{
-			CreateError(-7777795, "lexem not parsed ", source.line_number);
+			CreateError(source.line_number, -7777795, "lexem not parsed ");
 			source.Finish();
 		}
 		break;
@@ -124,25 +126,36 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 	return result;
 }
 
+
+
 statement_t * namespace_t::CheckOperator_THROW(SourcePtr &source)
 {
 	operator_THROW * result = new operator_THROW;
 
-	if (source != false)
-		switch (source.lexem)
-		{
-		case lt_string:
-		{
-			result->exception_constant = new constant_node_t(source.value.c_str());
-			break;
-		}
-		default:
-			throw "Unparsed 'throw' state";
-		}
-	source++;
-	if (source == false || source.lexem != lt_semicolon)
+    if (source != false)
+    {
+        expression_t * exp = ParseExpression(source);
+        if (exp == nullptr || exp->root == nullptr)
+        {
+            CreateError(source.line_number, -7777795, "throw argument format error");
+            source.Finish();
+            return nullptr;
+        }
+        expression_node_t * root = exp->root;
+        switch (root->lexem)
+        {
+        case lt_string:
+        {
+            result->exception_constant = new constant_node_t(root->constant->char_pointer);
+            break;
+        }
+        default:
+            throw "Unparsed 'throw' state";
+        }
+    }
+    if (source == false || source.lexem != lt_semicolon)
 	{
-		errors.Add(-7777286, "Expect semicolon after 'throw operand'", source.line_number);
+		CreateError(source.line_number, -7777286, "Expect semicolon after 'throw operand'");
 	}
 	return result;
 }
@@ -157,13 +170,13 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 		source++;
 		if (source == false || source.lexem != lt_catch)
 		{
-			CreateError(-7777795, "'try' operator not followed with 'catch'", source.line_number);
+			CreateError(source.line_number, -7777795, "'try' operator not followed with 'catch'");
 			continue;
 		}
 		source++;
 		if (source == false || source.lexem != lt_openbraket)
 		{
-			CreateError(-7777795, "'catch' operator must followed with '('", source.line_number);
+			CreateError(source.line_number, -7777795, "'catch' operator must followed with '('");
 			continue;
 		}
 
@@ -178,7 +191,7 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 		}
 		if (result->handler->arguments.size() != 1)
 		{
-			CreateError(-7777795, "'catch' wrong argument count for exception handler", source.line_number);
+			CreateError(source.line_number, -7777795, "'catch' wrong argument count for exception handler");
 			continue;
 		}
 
@@ -188,7 +201,7 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 		source++;
 		if (source == false || source.lexem != lt_openblock)
 		{
-			CreateError(-7777795, "'catch' exception handler body expected", source.line_number);
+			CreateError(source.line_number, -7777795, "'catch' exception handler body expected" );
 			continue;
 		}
         result->handler->space->owner_function = result->handler;
@@ -219,13 +232,13 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 		case expression_state:
 			if (source.lexem != lt_openbraket)
 			{
-				CreateError(-777782, "condition absent for operator if", source.line_number);
+				CreateError(source.line_number, -777782, "condition absent in operator if" );
 				source.Finish();
 				return nullptr;
 			}
 			if (source.sequence == nullptr || source.sequence->size() == 0)
 			{
-				CreateError(-777782, "empty condition in operator if", source.line_number);
+				CreateError(source.line_number, -777782, "empty condition in operator if" );
 				source.Finish();
 				return nullptr;
 			}
@@ -279,22 +292,24 @@ statement_t * namespace_t::CheckOperator_DO(SourcePtr &source)
 	operator_DO * result = new operator_DO;
 	result->body = CreateStatement(source, spacetype_t::continue_space);
 
-	if (source.lexem != lt_while)
+    if (source == true && source.lexem == lt_semicolon)
+        source++;
+	if (source == false || source.lexem != lt_while)
 	{
-		CreateError(-777313, "expect 'while' expression", source.line_number);
+		CreateError(source.line_number, -777313, "expect 'while' expression");
 		source.Finish();
 		return nullptr;
 	}
 	source++;
 	if (source.lexem != lt_openbraket)
 	{
-		CreateError(-777312, "while condition format error", source.line_number);
+		CreateError(source.line_number, -777312, "while condition format error");
 		source.Finish();
 		return nullptr;
 	}
 	if (source.sequence == nullptr || source.sequence->size() == 0)
 	{
-		CreateError(-777782, "empty condition in operator if", source.line_number);
+		CreateError(source.line_number, -777782, "empty condition in operator if" );
 		source.Finish();
 		return nullptr;
 	}
@@ -308,7 +323,7 @@ statement_t * namespace_t::CheckOperator_WHILE(SourcePtr &source)
 {
 	if (source.lexem != lt_openbraket)
 	{
-		CreateError(-778312, "while(){} condition format error", source.line_number);
+		CreateError(source.line_number, -778312, "while(){} condition format error" );
 		return nullptr;
 	}
 
@@ -323,7 +338,7 @@ statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source)
 {
 	if (source.lexem != lt_openbraket)
 	{
-		CreateError(-777202, "empty condition in operator 'for'", source.line_number);
+		CreateError(source.line_number, -777202, "empty condition in operator 'for'" );
 		source.Finish();
 		return nullptr;
 	}
@@ -341,7 +356,12 @@ statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source)
 	if (ptr != false && ptr.lexem == lt_semicolon)
 	{
 		ptr++;
-		result->condition = result->body->ParseExpression(ptr);
+        if (ptr.lexem != lt_semicolon)
+            result->condition = result->body->ParseExpression(ptr);
+        else
+        {
+            result->condition = nullptr;
+        }
 	}
 	if (ptr != false && ptr.lexem == lt_semicolon)
 	{
@@ -381,7 +401,7 @@ statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 		case startup_state:
 			if (source.lexem != lt_openbraket)
 			{
-				CreateError(-7777732, "switch open barcket expected", source.line_number);
+				CreateError(source.line_number, -7777732, "switch open barcket expected");
 				delete result;
 				return nullptr;
 			}
@@ -393,7 +413,7 @@ statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 		case switch_expression_state:
 			if (source.lexem != lt_openblock)
 			{
-				CreateError(-7777733, "switch open block expected", source.line_number);
+				CreateError(source.line_number, -7777733, "switch open block expected");
 				source.Finish();
 				delete result;
 				return nullptr;
@@ -406,7 +426,7 @@ statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 			continue;
 
 		case finish_state:
-			CreateError(-7777733, "wrong terms after switch block", source.line_number);
+			CreateError(source.line_number, -7777733, "wrong terms after switch block");
 			source.Finish();
 			delete result;
 			return nullptr;
@@ -444,14 +464,14 @@ statement_t * namespace_t::CheckOperator_BREAK(SourcePtr &source)
 {
 	if (source.lexem != lt_semicolon)
 	{
-		CreateError(-7777737, "wroing input after break operator", source.line_number);
+		CreateError(source.line_number, -7777737, "wroing input after break operator" );
 		return nullptr;
 	}
 
 	namespace_t	*	breakeable = findBreakableSpace(false);
 	if (breakeable == nullptr)
 	{
-		CreateError(-7777737, "operator break allowe only witin loops and switches", source.line_number);
+		CreateError(source.line_number, -7777737, "operator break allowe only witin loops and switches" );
 		return nullptr;
 	}
 	source++;
@@ -468,6 +488,9 @@ char namespace_t::TranslateCharacter(SourcePtr source)
     if ( source.value.length() == 2 && source.value[0] == '\\')
         switch (source.value[1])
         {
+        case '0':
+            ch = '\0';
+            break;
         case 'r':
             ch = '\r';
             break;
@@ -487,7 +510,7 @@ char namespace_t::TranslateCharacter(SourcePtr source)
             ch = '\"';
             break;
         default:
-            CreateError(-7776137, "Unparsed character sequence", source.line_number);
+            CreateError(source.line_number, -7776137, "Unparsed character sequence");
             break;
         }
     else
@@ -521,7 +544,7 @@ statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
                 case_value = TranslateCharacter(source);
                 break;
             default:
-                CreateError(-7777938, "non integer case label", source.line_number);
+                CreateError(source.line_number, -7777938, "non integer case label");
                 source.Finish();
                 continue;
             }
@@ -529,7 +552,7 @@ statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
 		source++;
 		if (source.lexem != lt_colon)
 		{
-			CreateError(-7777734, "case colon expected", source.line_number);
+			CreateError(source.line_number, -7777734, "case colon expected");
 			source.Finish();
 			continue;
 		}
@@ -544,7 +567,7 @@ statement_t * namespace_t::CheckOperator_DEFAULT(SourcePtr &source)
 {
 	if (source.lexem != lt_colon)
 	{
-		CreateError(-7777737, "wroing input after 'default' operator", source.line_number);
+		CreateError(source.line_number, -7777737, "wrong input after 'default' operator. Expected colon.");
 		return nullptr;
 	}
 	opeator_DEFAULT * result = new opeator_DEFAULT;
@@ -555,14 +578,14 @@ statement_t * namespace_t::CheckOperator_CONTINUE(SourcePtr &source)
 {
 	if (source.lexem != lt_semicolon)
 	{
-		CreateError(-7777737, "wroing input after 'continue' operator", source.line_number);
+		CreateError(source.line_number, -7777737, "wrong input after 'continue' operator - colon expected" );
 		return nullptr;
 	}
 
 	namespace_t	*	space = findBreakableSpace(true);
 	if (space == nullptr)
 	{
-		CreateError(-7777737, "operator 'continue' allowed only witin loops and switches", source.line_number);
+		CreateError(source.line_number, -7777737, "operator 'continue' allowed only witin loops");
 		return nullptr;
 	}
 
@@ -575,7 +598,7 @@ statement_t * namespace_t::CheckOperator_GOTO(SourcePtr & source)
 {
 	if (source.index == source.eof || source.lexem != lt_word)
 	{
-		CreateError(-7777737, "operator 'goto' expected a label", source.line_number);
+		CreateError(source.line_number, -7777737, "operator 'goto' expected a label" );
 		return nullptr;
 	}
 	operator_GOTO	*	statement = new operator_GOTO;
@@ -583,7 +606,7 @@ statement_t * namespace_t::CheckOperator_GOTO(SourcePtr & source)
 	source++;
 	if (source.index == source.eof || source.lexem != lt_semicolon)
 	{
-		CreateError(-7777737, "operator 'goto' label format error", source.line_number);
+		CreateError(source.line_number, -7777737, "operator 'goto' label format error");
 		return nullptr;
 	}
 	source++;
@@ -613,7 +636,7 @@ statement_t * namespace_t::CheckOperator_DELETE(SourcePtr & source)
 
 	} while (false);
 
-	CreateError(-7777737, "wrong form of operator delete", source.line_number);
+	CreateError(source.line_number, -7777737, "wrong form of operator delete");
 	return nullptr;
 }
 
@@ -621,7 +644,7 @@ statement_t * namespace_t::CheckOperator_OPERATOR(SourcePtr &source)
 {
 	if (source.index == source.eof)
 	{
-		CreateError(-7777737, "operator 'continue' allowed only witin loops and switches", source.line_number);
+		CreateError(source.line_number, -7777737, "operator definition format error");
 		return nullptr;
 	}
 
@@ -665,14 +688,14 @@ statement_t * namespace_t::CheckOperator_OPERATOR(SourcePtr &source)
 #endif
 					return ex;
 				}
-				CreateError(-7771232, "Function not found", source.line_number);
+				CreateError(source.line_number, -7771232, "Function not found" );
 				return nullptr;
 			}
 		}
 		break;
 
 	default:
-		CreateError(-7773737, "operator 'operator' not defined", source.line_number);
+		CreateError(source.line_number, -7773737, "operator 'operator' not defined" );
 		return nullptr;
 	}
 	return nullptr;
@@ -691,7 +714,7 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 	arg_ptr++;
 	if (arg_ptr.lexem != lt_openbraket)
 	{
-		this->CreateError(-777780, "overload operator format error", overload.line_number);
+		this->CreateError(overload.line_number, -777780, "overload operator format error");
 		overload.Finish();
 		return;
 	}
@@ -717,13 +740,13 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 		type_t * type = FindType(overload.value);
 		if (type == nullptr)
 		{
-			CreateError(-7771732, "syntax error (not a type)", overload.line_number);
+			CreateError(overload.line_number, -7771732, "syntax error ( '%s' is not a type)", overload.value);
 			return;
 		}
 		overload++;
 		if (overload.lexem != lt_openbraket)
 		{
-			CreateError(-7771733, "expected open parentese on ", overload.line_number);
+			CreateError(overload.line_number, -7771733, "expected open parentese" );
 			return;
 		}
 		operator_body = CreateOperator(type, "operator_conversion_type", overload.sequence, linkage);
@@ -731,23 +754,23 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 	}
 
 	default:
-		this->CreateError(-177750, "Unable overlooad operator", overload.line_number);
+		this->CreateError(overload.line_number, -177750, "Unable overlooad operator");
 	}
 	overload++;
 	overload++;
 	if (overload == false || overload.lexem != lt_openblock)
 	{
-		CreateError(-7777704, "non-terminated operator definition", overload.line_number);
+		CreateError(overload.line_number, -7777704, "non-terminated operator definition");
 		overload.Finish();
 		return;
 	}
 	if (this->type == spacetype_t::function_space)
 	{
-		CreateError(-7777705, "function inside function not allowed", overload.line_number);
+		CreateError(overload.line_number, -7777705, "function inside function not allowed");
 		overload.Finish();
 		return;
 	}
-	operator_body->Parse(this, overload.statements);
+	operator_body->Parse(overload.line_number, this, overload.statements);
 	overload++;
 	return;
 }

@@ -74,20 +74,20 @@ function_overload_t * namespace_t::CheckCostructorDestructor(linkage_t * linkage
 		function = this->CreateFunction(type, name, source.sequence, linkage);
 		if (function->function->type != type)
 		{
-			CreateError(-7777111, "namespace_t::CheckCostructorDestructor:: type mismatch", source.line_number);
+			CreateError(source.line_number, -7777111, "namespace_t::CheckCostructorDestructor:: type mismatch");
 			source.Finish();
 			continue;
 		}
 		if (function->space != nullptr)
 		{
-			CreateError(-7777111, "Method already defined", source.line_number);
+			CreateError(source.line_number, -7777111, "Method already defined");
 			source.Finish();
 			continue;
 		}
 		source++;
 		if (source == false)
 		{
-			CreateError(-7778911, "Non terminated function detected", source.line_number);
+			CreateError(source.line_number, -7778911, "Non terminated function detected");
 			source.Finish();
 			continue;
 		}
@@ -98,7 +98,7 @@ function_overload_t * namespace_t::CheckCostructorDestructor(linkage_t * linkage
 		}
 		if (source.lexem == lt_openblock)
 		{
-			function->Parse(this, source.statements);
+			function->Parse(source.line_number, this, source.statements);
 			source++;
 			continue;
 		}

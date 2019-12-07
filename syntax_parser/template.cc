@@ -80,7 +80,7 @@ variable_base_t *  namespace_t::TranslateVariable(namespace_t * space, variable_
 	variable_base_t * var = nullptr;
 	type_t * t = TryTranslateType(v->type);
 	if (t == nullptr)
-		CreateError(-7775102, "Cannot find variaable type", 0);
+		CreateError(0, -7775102, "Cannot find variable type");
 	else
 	{
 		var = new variable_base_t(this, t, v->name, v->storage);
@@ -175,7 +175,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 			t = this->TryLexenForType(source);
 			if (t == nullptr)
 			{
-				CreateError(-7775132, "Unable get type in template ", source.line_number);
+				CreateError(source.line_number, -7775132, "Unable get type in template ");
 				source.Finish();
 				continue;
 			}
@@ -186,17 +186,17 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 			switch (source.lexem)
 			{
 			case lt_comma:
-				printf("Found class template type - %s %s\n", name.c_str(), t->name.c_str());
+				fprintf(stderr, "Found class template type - %s %s\n", name.c_str(), t->name.c_str());
 				instance_types.insert(std::make_pair(t->name, t));
 				state = check_type;
 				continue;
 			case lt_more:
-				printf("Found class template type - %s %s\n", name.c_str(), t->name.c_str());
+				fprintf(stderr, "Found class template type - %s %s\n", name.c_str(), t->name.c_str());
 				instance_types.insert(std::make_pair(t->name.c_str(), t));
 				state = create_instance;
 				continue;
 			default:
-				CreateError(-7775132, "Wrong lexem on instance template", source.line_number);
+				CreateError(source.line_number, -7775132, "Wrong lexem (%d) on instance template", source.lexem);
 				source.Finish();
 				continue;
 			}
@@ -204,7 +204,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 		case create_instance:
 			if (source.lexem != lt_word)
 			{
-				CreateError(-7735132, "instance object name exprected", source.line_number);
+				CreateError(source.line_number, -7735132, "instance object name exprected");
 				source.Finish();
 				continue;
 			}
@@ -244,13 +244,13 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 					expression_t * expr = ParseExpression(ptr);
 					if (constructor == nullptr)
 					{
-						CreateError(-7775136, "object has no appropriate constructor", source.line_number);
+						CreateError(source.line_number, -7775136, "object has no appropriate constructor");
 						break;
 					}
 					call_constructor->arguments.push_back(expr);
 					if (ptr == true && ptr.lexem != lt_comma)
 					{
-						CreateError(-7775136, "Wrong argument format", source.line_number);
+						CreateError(source.line_number, -7775136, "Wrong argument format");
 						break;;
 					}
 					ptr++;
@@ -262,7 +262,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 		{
 			linkage_t linkage; // Need take from template!!!
 			CreateVariable(instance->type, instance->name, &linkage);
-			printf("Declaration in instance of variable '%s%s' completed?\n", name.c_str(), instance->name.c_str());
+			fprintf(stderr, "Declaration in instance of variable '%s%s' completed?\n", name.c_str(), instance->name.c_str());
 			continue;
 		}
 		throw "Check if constructor without arguments";
@@ -286,7 +286,7 @@ function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, in
 	t = TryTranslateType(func->type);
 	if (!t)
 	{
-		CreateError(-7775102, "Cannot find type", line_number);
+		CreateError(line_number, -7775102, "Cannot find type", func->type->name.c_str());
 	}
 	else
 	{
@@ -301,7 +301,7 @@ function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, in
 				t = TryTranslateType(a.type);
 				if (!t)
 				{
-					CreateError(-7775102, "Cannot find type", line_number);
+					CreateError(line_number, -7775102, "Cannot find argument type '%s'", a.type->name.c_str());
 					delete instance;
 					instance = nullptr;
 					break;
@@ -353,7 +353,7 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
 			t = this->TryLexenForType(source);
 			if (t == nullptr)
 			{
-				CreateError(-7775132, "Unable get type in template ", source.line_number);
+				CreateError(source.line_number, -7775132, "Unable get type in template ");
 				source.Finish();
 				continue;
 			}
@@ -364,19 +364,19 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
 			switch (source.lexem)
 			{
 			case lt_comma:
-				printf("Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
+				fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
 				instance_types.insert(std::make_pair(arg_ptr->type->name, t));
 				++arg_ptr;
 				state = check_type;
 				continue;
 			case lt_more:
-				printf("Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
+				fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
 				instance_types.insert(std::make_pair(arg_ptr->type->name, t));
 				++arg_ptr;
 				state = create_instance;
 				continue;
 			default:
-				CreateError(-7775132, "Wrong lexem on instance template", source.line_number);
+				CreateError(source.line_number, -7775132, "Wrong lexeme (%d) on instance template", source.lexem);
 				source.Finish();
 				continue;
 			}
@@ -384,12 +384,12 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
 
 		case create_instance:
 			instance = CreateFunctionInstance(func, source.line_number);
-			printf("Create function instance form template\n");
+			fprintf(stderr, "Create function instance form template\n");
 			state = finish;
 			break;
 
 		case finish:
-			printf("This is function template instance finish\n");
+			fprintf(stderr, "This is function template instance finish\n");
 			break;
 		}
 
@@ -454,7 +454,7 @@ void namespace_t::ParseTemplate(SourcePtr & source)
 				}
 				throw "type is not known in parser template.cc";
 			}
-			CreateError(-7775132, "Wrong delimiter in template arguments", source.line_number);
+			CreateError(source.line_number, -7775132, "Wrong delimiter in template arguments");
 			source.Finish();
 			continue;
 		}
@@ -468,14 +468,14 @@ void namespace_t::ParseTemplate(SourcePtr & source)
 				x->space->name = source.value;
 			x->space->ParseStatement(source);
 #if true
-			printf("TODO store template\n");
+			fprintf(stderr, "TODO store template\n");
 
 			for (auto t : x->space->space_types_list)
 				this->template_types_map.insert(std::make_pair(t->name, t));
 			for (auto f : x->space->function_list)
 				this->template_function_map.insert(std::make_pair(f->name, f));
 #endif
-			printf("Parse templated object\n");
+			fprintf(stderr, "Parse templated object\n");
 			break;
 		}
 	}
