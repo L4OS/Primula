@@ -2,6 +2,11 @@
 #include "lexem_tree_root.h"
 
 #include <stack>
+#include <string>
+
+#if ! MODERN_COMPILER
+#include <stdlib.h>
+#endif
 
 extern int GetLexemPriority(lexem_type_t  lex);
 
@@ -13,15 +18,15 @@ private:
 		wait_name_delimiter,
 		dot_state,
 		find_function_state
-	} state = default_state;
+	} state;
 
 	std::deque<shunting_yard_t>	operands;
 	std::deque<shunting_yard_t> operators;
 	bool prev_was_operand;
 
-	namespace_t		*	space_state = nullptr;
-	variable_base_t	*	variable_state = nullptr;
-	function_parser		*	function_state = nullptr;
+    namespace_t		    *	space_state;        // = nullptr;
+    variable_base_t	    *	variable_state;     // = nullptr;
+    function_parser		*	function_state;     // = nullptr;
 
 	variable_base_t		*	FindVariable(shunting_yard_t * pYard);
 	type_t *				CreateType(shunting_yard_t * yard);
@@ -45,6 +50,8 @@ public:
 		state = default_state;
 		space_state = current_space;
 		prev_was_operand = false;
+        variable_state = nullptr;
+        function_state = nullptr;
 	}
 };
 
@@ -62,7 +69,12 @@ int ExpressionParser::Parse(SourcePtr &source)
     case lt_openindex:
     {
         ExpressionParser	index_parser(space_state);
+#if MODERN_COMPILER
         index_parser.ParseExpression(SourcePtr(source.sequence));
+#else
+        SourcePtr ptr(source.sequence);
+        index_parser.ParseExpression(ptr);
+#endif
         FixExpression(shunt, prio);
         shunting_yard_t * index_exp = new shunting_yard_t(*index_parser.PrepareExpression());
         operands.push_back(*index_exp);
@@ -304,10 +316,17 @@ constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
     }
 
 	case lt_integer:
-		if (yard->text.rfind("0x", 0) == 0)
-			constant = new constant_node_t(std::stoi(yard->text, nullptr, 16));
-		else
-			constant = new constant_node_t(std::stoi(yard->text));
+#if MODERN_COMPILER
+        if (yard->text.rfind("0x", 0) == 0)
+            constant = new constant_node_t(std::stoi(yard->text, nullptr, 16));
+        else
+            constant = new constant_node_t(std::stoi(yard->text));
+#else
+        if (yard->text.rfind("0x", 0) == 0)
+            constant = new constant_node_t((int)strtol(yard->text.c_str(), nullptr, 16));
+        else
+            constant = new constant_node_t(atoi(yard->text.c_str()));
+#endif
 		break;
 
 	case lt_string:
@@ -315,7 +334,11 @@ constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
 		break;
 
 	case lt_floatnumber:
-		constant = new constant_node_t(std::stof(yard->text));
+#if MODERN_COMPILER
+        constant = new constant_node_t(std::stof(yard->text));
+#else
+        constant = new constant_node_t((float) atof(yard->text.c_str()));
+#endif
 		break;
 
 	default:
@@ -456,7 +479,12 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
                     structure_t * structure = (structure_t *)type;
                     //if (left->variable)
                     {
+#if MODERN_COMPILER
                         auto pair = structure->space->space_variables_map.find(yard->text);
+#else
+                        std::map<std::string, variable_base_t*>::iterator pair;
+                        pair = structure->space->space_variables_map.find(yard->text);
+#endif
                         if (pair != structure->space->space_variables_map.end())
                         {
                             variable_base_t * tmp = pair->second;
@@ -467,12 +495,25 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
                             node->variable = tmp;
                             break;
                         }
+#if MODERN_COMPILER
                         for (auto inherited_from : structure->space->inherited_from)
                         {
                             var = inherited_from->space->FindVariable(yard->text);
                             if (var != nullptr)
                                 break;
                         }
+#else
+                        std::list<structure_t*>::iterator inherited_from;
+                        for (
+                            inherited_from = structure->space->inherited_from.begin();
+                            inherited_from != structure->space->inherited_from.end();
+                            ++inherited_from)
+                        {
+                            var = (*inherited_from)->space->FindVariable(yard->text);
+                            if (var != nullptr)
+                                break;
+                        }
+#endif
                         if (var != nullptr)
                         {
                             node = new expression_node_t(lt_variable);
@@ -915,7 +956,12 @@ void ExpressionParser::ParseOperator_NEW(SourcePtr &source)
 		if (source.lexem == lt_openindex)
 		{
 			ExpressionParser	index_parser(space_state);
-			index_parser.ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+            index_parser.ParseExpression(SourcePtr(source.sequence));
+#else
+            SourcePtr ptr(source.sequence);
+            index_parser.ParseExpression(ptr);
+#endif
 			//			printf("Complete index parsing in operator 'new'\n");
 
 			shunting_yard_t * rval = new shunting_yard_t(index_parser.operands.back());
@@ -948,8 +994,14 @@ void ExpressionParser::ParseOperator_SIZEOF(SourcePtr &source)
 			continue;
 		}
         ExpressionParser	arg_parser(space_state);
+#if MODERN_COMPILER
         arg_parser.ParseExpression(SourcePtr(source.sequence));
+#else
+        SourcePtr ptr(source.sequence);
+        arg_parser.ParseExpression(ptr);
+#endif
 
+        expression_t	* sizeof_exp = nullptr;
         if (arg_parser.operands.size() == 1 && arg_parser.operators.size() == 0)
         {
             // Check type
@@ -961,7 +1013,7 @@ void ExpressionParser::ParseOperator_SIZEOF(SourcePtr &source)
                     goto type_found;
             }
         }
-        expression_t	* sizeof_exp = arg_parser.BuildExpression();
+        sizeof_exp = arg_parser.BuildExpression();
         if (sizeof_exp == nullptr)
         {
             this->space_state->CreateError(source.line_number, -77771237, "cannot parse sizeof argument");
@@ -972,7 +1024,13 @@ void ExpressionParser::ParseOperator_SIZEOF(SourcePtr &source)
 type_found:
         shunting_yard_t		yard(source);
         int sz = type->bitsize >> 3;
-		yard.text = std::to_string(sz);
+#if MODERN_COMPILER
+        yard.text = std::to_string(sz);
+#else
+        char fix[16];
+        snprintf(fix, 16, "%d", sz);
+        yard.text = fix;
+#endif
 		yard.lexem = lt_integer;
 		this->operands.push_back(yard);
 		continue;

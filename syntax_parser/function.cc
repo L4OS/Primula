@@ -27,36 +27,70 @@ static void SplitFunctionArguments(Code::lexem_list_t args, Code::statement_list
 	Code::lexem_list_t argument;
 
 	int barakets_counter = 0;
-	for (auto lex : args)
-	{
-		if (lex.lexem == lt_openbraket)
-		{
-			barakets_counter++;
-			state = skip_subexpression;
-		}
+#if MODERN_COMPILER
+    for (auto lex : args)
+    {
+        if (lex.lexem == lt_openbraket)
+        {
+            barakets_counter++;
+            state = skip_subexpression;
+        }
 
-		switch (state)
-		{
-		case find_delimiter:
-			if (lex.lexem == lt_comma)
-			{
-				splitted->push_back(argument);
-				argument.clear();
-				continue;
-			}
+        switch (state)
+        {
+        case find_delimiter:
+            if (lex.lexem == lt_comma)
+            {
+                splitted->push_back(argument);
+                argument.clear();
+                continue;
+            }
 
-		case skip_subexpression:
-			if (lex.lexem == lt_closebraket)
-			{
-				if (barakets_counter)
-					barakets_counter--;
-				else
-					state = find_delimiter;
-			}
-		}
-		argument.push_back(lex);
-		continue;
-	}
+        case skip_subexpression:
+            if (lex.lexem == lt_closebraket)
+            {
+                if (barakets_counter)
+                    barakets_counter--;
+                else
+                    state = find_delimiter;
+            }
+        }
+        argument.push_back(lex);
+        continue;
+    }
+#else
+    Code::lexem_list_t::iterator  lex;
+    for (lex = args.begin(); lex != args.end(); ++lex)
+    {
+        if (lex->lexem == lt_openbraket)
+        {
+            barakets_counter++;
+            state = skip_subexpression;
+        }
+
+        switch (state)
+        {
+        case find_delimiter:
+            if (lex->lexem == lt_comma)
+            {
+                splitted->push_back(argument);
+                argument.clear();
+                continue;
+            }
+
+        case skip_subexpression:
+            if (lex->lexem == lt_closebraket)
+            {
+                if (barakets_counter)
+                    barakets_counter--;
+                else
+                    state = find_delimiter;
+            }
+        }
+        argument.push_back(*lex);
+        continue;
+    }
+#endif
 	if(argument.size() > 0)
 		splitted->push_back(argument);
 }
@@ -64,7 +98,8 @@ static void SplitFunctionArguments(Code::lexem_list_t args, Code::statement_list
 variable_base_t * function_overload_t::FindArgument(std::string name)
 {
 	variable_base_t * var = nullptr;
-	for (auto arg : this->arguments)
+#if MODERN_COMPILER
+    for (auto arg : this->arguments)
 	{
 		if (arg.name == name)
 		{
@@ -73,6 +108,18 @@ variable_base_t * function_overload_t::FindArgument(std::string name)
 			break;
 		}
 	}
+#else
+    arg_list_t::iterator    arg;
+    for (arg = arguments.begin(); arg != arguments.end(); ++arg)
+    {
+        if (arg->name == name)
+        {
+            var = new farg_t(*arg);
+            var->name = name;
+            break;
+        }
+    }
+#endif
 	return var;
 }
 
@@ -157,7 +204,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 		got_three_dots
 	} state = wait_type;
 
-	for (auto node = source; status == 0 && node == true; node == true ? node++ : node)
+	for (SourcePtr node = source; status == 0 && node == true; node == true ? node++ : node)
 	{ 
 		switch (state)
 		{
@@ -359,7 +406,8 @@ void function_overload_parser::MangleArguments()
 {
 	if (arguments.size() > 0)
 	{
-		for (auto & arg : arguments)
+#if MODERN_COMPILER
+        for (auto & arg : arguments)
 		{
 			if (arg.type != nullptr)
 			{
@@ -370,6 +418,20 @@ void function_overload_parser::MangleArguments()
 			else
 				mangle += "...";
 		}
+#else
+        arg_list_t::iterator arg;
+        for (arg = arguments.begin(); arg != arguments.end(); ++arg)
+        {
+            if (arg->type != nullptr)
+            {
+                MangleType(arg->type, mangle);
+                if (&(*arg) != &arguments.back())
+                    mangle += ",";
+            }
+            else
+                mangle += "...";
+        }
+#endif
 	}
 	this->mangle = "@" + mangle;
 }
@@ -381,7 +443,8 @@ void	function_parser::RegisterFunctionOverload(function_overload_t * overload)
 
 void function_parser::FindBestFunctionOverload(call_t * call)
 {
-	//	function_overload_t * overload = nullptr;
+#if MODERN_COMPILER
+    //	function_overload_t * overload = nullptr;
 	for (auto function : this->overload_list)
 	{
 		call->code = function;
@@ -412,7 +475,40 @@ void function_parser::FindBestFunctionOverload(call_t * call)
 		if (call->code != nullptr)
 			break;
 	}
+#else
+    function_overload_list_t::iterator  function;
+    for (function = overload_list.begin(); function != overload_list.end(); ++function)
+    {
+        call->code = *function;
 
+        arg_list_t::iterator		arg_proto = (*function)->arguments.begin();
+        std::list<expression_t *>::iterator arg;
+        for (arg = call->arguments.begin(); arg != call->arguments.end(); ++arg)
+        {
+            const type_t * proto = arg_proto->type;
+            const type_t *  type = (*arg)->type;
+            if (proto == nullptr)
+            {
+                // We found "..."
+                break;
+            }
+            bool zero_rval = (*arg)->IsConstZero();
+            if (CompareTypes(proto, type, true, zero_rval) != no_cast)
+            {
+                arg_proto++;
+                continue;
+            }
+            else
+            {
+                //				printf("types_not_match, but we still looking for function\n");
+                call->code = nullptr;
+                break;
+            }
+        }
+        if (call->code != nullptr)
+            break;
+    }
+#endif
 	if (call->code != nullptr)
 	{
 //		printf("found calling function %s%s\n", this->name.c_str(), call->code->mangle.c_str());
@@ -460,7 +556,12 @@ function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name
 	function_parser * function = nullptr;
 	function_overload_t * exist = nullptr;
 
-	auto pair = function_map.find(name);
+#if MODERN_COMPILER
+    auto pair = function_map.find(name);
+#else
+    std::map<std::string, class function_parser*>::iterator pair;
+    pair = function_map.find(name);
+#endif
 	if (pair != function_map.end())
 		function = pair->second;
 
@@ -477,7 +578,8 @@ function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name
 		overload->ParseArgunentDefinition(this, sequence);
 	overload->MangleArguments();
 
-	for (auto func : function->overload_list)
+#if MODERN_COMPILER
+    for (auto func : function->overload_list)
 	{
 		if(func->mangle == overload->mangle)
 		{
@@ -485,6 +587,17 @@ function_overload_t * namespace_t::CreateFunction(type_t *type, std::string name
 			break;
 		}
 	}
+#else
+    function_overload_list_t::iterator	func;
+    for(func = function->overload_list.begin(); func != function->overload_list.end(); ++func)
+    {
+        if ((*func)->mangle == overload->mangle)
+        {
+            exist = *func;
+            break;
+        }
+    }
+#endif
 	if (exist == nullptr)
 	{
 		function->RegisterFunctionOverload(overload);

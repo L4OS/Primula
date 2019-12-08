@@ -1,5 +1,8 @@
 #include "namespace.h"
 
+#if ! MODERN_COMPILER
+#  include <stdlib.h>
+#endif
 statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 {
 	return_t * statement = nullptr;
@@ -90,8 +93,14 @@ statement_t * namespace_t::CreateStatement(SourcePtr &source, spacetype_t space_
 	{
 		codeblock_t	* block = new codeblock_t;
 		block->block_space = CreateSpace(space_type, std::string(""));
-		for (auto statement : *source.statements)
+#if MODERN_COMPILER
+        for (auto statement : *source.statements)
 			block->block_space->ParseStatement(statement);
+#else
+        Code::statement_list_t::iterator    statement;
+        for( statement = source.statements->begin(); statement != source.statements->end(); ++statement)
+            block->block_space->ParseStatement(*statement);
+#endif
 		result = block;
 		source++;
 		break;
@@ -165,7 +174,7 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 	operator_TRY * result = new operator_TRY;
 	do
 	{
-		result->body = CreateSpace(spacetype_t::codeblock_space, std::string(""));
+		result->body = CreateSpace(codeblock_space, std::string(""));
 		result->body->Parse(*source.statements);
 		source++;
 		if (source == false || source.lexem != lt_catch)
@@ -184,7 +193,7 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 		function_parser  * handler = new function_parser(GetBuiltinType(lt_void), "");
 		function_overload_parser * overload = new function_overload_parser(handler, &linkage);
 		result->handler = overload;
-		result->handler->space = CreateSpace(spacetype_t::exception_handler_space, "operator");
+		result->handler->space = CreateSpace(exception_handler_space, "operator");
 		if (source.sequence->size() > 0)
 		{
 			overload->ParseArgunentDefinition(this, source.sequence);
@@ -242,13 +251,20 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 				source.Finish();
 				return nullptr;
 			}
-			result->expression = ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+            result->expression = ParseExpression(SourcePtr(source.sequence));
+#else
+            {
+                SourcePtr ptr(source.sequence);
+                result->expression = ParseExpression(ptr);
+            }
+#endif
 			source++;
 			state = true_condition_state;
 			continue;
 
 		case true_condition_state:
-			result->true_statement = CreateStatement(source, spacetype_t::codeblock_space);
+			result->true_statement = CreateStatement(source, codeblock_space);
 			if (source != false && (source.lexem == lt_semicolon || source.lexem == lt_openblock))
 				++source; // Check this later
 			state = check_else_state;
@@ -271,7 +287,7 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 			break;
 
 		case else_condition_state:
-			result->false_statement = CreateStatement(source, spacetype_t::codeblock_space);
+			result->false_statement = CreateStatement(source, codeblock_space);
 			if (source == true && source.lexem == lt_semicolon)
 				++source;
 			state = no_more_lexem_state;
@@ -290,7 +306,7 @@ statement_t * namespace_t::CheckOperator_IF(SourcePtr &source)
 statement_t * namespace_t::CheckOperator_DO(SourcePtr &source)
 {
 	operator_DO * result = new operator_DO;
-	result->body = CreateStatement(source, spacetype_t::continue_space);
+	result->body = CreateStatement(source, continue_space);
 
     if (source == true && source.lexem == lt_semicolon)
         source++;
@@ -313,7 +329,12 @@ statement_t * namespace_t::CheckOperator_DO(SourcePtr &source)
 		source.Finish();
 		return nullptr;
 	}
-	result->expression = ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+    result->expression = ParseExpression(SourcePtr(source.sequence));
+#else
+    SourcePtr ptr(source.sequence);
+    result->expression = ParseExpression(ptr);
+#endif
 	source++;
 
 	return result;
@@ -328,9 +349,14 @@ statement_t * namespace_t::CheckOperator_WHILE(SourcePtr &source)
 	}
 
 	operator_WHILE * result = new operator_WHILE;
-	result->expression = this->ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+    result->expression = this->ParseExpression(SourcePtr(source.sequence));
+#else
+    SourcePtr ptr(source.sequence);
+    result->expression = this->ParseExpression(ptr);
+#endif
 	source++;
-	result->body = CreateStatement(source, spacetype_t::continue_space);
+	result->body = CreateStatement(source, continue_space);
 	return result;
 }
 
@@ -373,10 +399,21 @@ statement_t * namespace_t::CheckOperator_FOR(SourcePtr &source)
 		result->body->ParseStatement(source);
 	else
 	{
-		for (auto statement : *source.statements)
+#if MODERN_COMPILER
+        for (auto statement : *source.statements)
 		{
 			result->body->ParseStatement(statement);
 		}
+#else
+        Code::statement_list_t::iterator    statement;
+        for (
+            statement = source.statements->begin();
+            statement != source.statements->end();
+            ++statement)
+        {
+            result->body->ParseStatement(*statement);
+        }
+#endif
 		source++;
 	}
 	//
@@ -405,7 +442,14 @@ statement_t * namespace_t::CheckOperator_SWITCH(SourcePtr &source)
 				delete result;
 				return nullptr;
 			}
-			result->expression = ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+            result->expression = ParseExpression(SourcePtr(source.sequence));
+#else
+            {
+                SourcePtr ptr(source.sequence);
+                result->expression = ParseExpression(ptr);
+            }
+#endif
 			state = switch_expression_state;
 			source++;
 			continue;
@@ -538,7 +582,11 @@ statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
             switch (source.lexem)
             {
             case lt_integer:
+#if MODERN_COMPILER
                 case_value = std::stoi(source.value);
+#else
+                case_value = atoi(source.value.c_str());
+#endif
                 break;
             case lt_character:
                 case_value = TranslateCharacter(source);
@@ -740,7 +788,7 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 		type_t * type = FindType(overload.value);
 		if (type == nullptr)
 		{
-			CreateError(overload.line_number, -7771732, "syntax error ( '%s' is not a type)", overload.value);
+			CreateError(overload.line_number, -7771732, "syntax error ( '%s' is not a type)", overload.value.c_str());
 			return;
 		}
 		overload++;
@@ -764,7 +812,7 @@ void namespace_t::CheckOverloadOperator(linkage_t * linkage, type_t * type, Sour
 		overload.Finish();
 		return;
 	}
-	if (this->type == spacetype_t::function_space)
+	if (this->type == function_space)
 	{
 		CreateError(overload.line_number, -7777705, "function inside function not allowed");
 		overload.Finish();

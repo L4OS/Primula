@@ -34,10 +34,18 @@ class CodeSplitter : public Code
 
 			if (fix != nullptr)
 			{
+#if MODERN_COMPILER
 				for (auto add : *statement_src)
-				{
-					fix->push_back(add);
-				}
+                {
+                    fix->push_back(add);
+                }
+#else
+                lexem_list_t::iterator  add;
+                for(add = node; add != end; add++)
+                {
+                    fix->push_back(*add);
+                }
+#endif
 				statement_list_t::iterator	doomed = statement_src;
 				statement_src++;
 				list->erase(doomed);

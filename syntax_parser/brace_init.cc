@@ -1,5 +1,9 @@
 #include "namespace.h"
 
+#if ! MODERN_COMPILER
+#include "stdlib.h"
+#endif
+
 #pragma region Static
 
 static static_data_t *	root = nullptr;
@@ -82,11 +86,19 @@ static static_data_t * Integer(type_t * type, Code::lexem_node_t * node)
 
     switch (type->prop)
     {
-    case type->signed_type:
+    case type_t::signed_type:
+#if MODERN_COMPILER
         data = new static_data_t(std::stoi(num, nullptr, base));
+#else
+        data = new static_data_t((int)strtol(num.c_str(), nullptr, base));
+#endif
         break;
-    case type->unsigned_type:
+    case type_t::unsigned_type:
+#if MODERN_COMPILER
         data = new static_data_t((unsigned int)std::stoi(num, nullptr, base));
+#else
+        data = new static_data_t((unsigned int)strtol(num.c_str(), nullptr, base));
+#endif
         break;
     }
     return data;
@@ -153,13 +165,13 @@ static_data_t * namespace_t::TryEnumsAndConstants(type_t * type, Code::lexem_nod
 {
     switch (type->prop)
     {
-    case type->typedef_type:
+    case type_t::typedef_type:
     {
         typedef_t * def = (typedef_t*)type;
         return TryEnumsAndConstants(def->type, node);
     }
-    case type->unsigned_type:
-    case type->signed_type:
+    case type_t::unsigned_type:
+    case type_t::signed_type:
     {
         expression_node_t * expr = nullptr;
         switch (node->lexem)
@@ -181,7 +193,7 @@ static_data_t * namespace_t::TryEnumsAndConstants(type_t * type, Code::lexem_nod
             throw "FSM error in TryEnumsAndConstants()";
         }
     }
-    case type->enumerated_type:
+    case type_t::enumerated_type:
     {
         enumeration_t * enu = (enumeration_t*)type;
         if (enu->enumeration.count(node->value) > 0)
@@ -213,13 +225,13 @@ static_data_t * namespace_t::CheckLexemeData(type_t * type, Code::lexem_node_t *
     {
         switch (type->prop)
         {
-        case type_t::property_t::compound_type:
+        case type_t::compound_type:
         {
             structure_t * structure = new structure_t(*(structure_t *)type);
             ok = BraceEncodedStructureInitialization(structure, node->statements);
             break;
         }
-        case type_t::property_t::dimension_type:
+        case type_t::dimension_type:
         {
             ok = new static_data_t(lt_openindex);
             array_t * array = (array_t*)type;
@@ -227,6 +239,7 @@ static_data_t * namespace_t::CheckLexemeData(type_t * type, Code::lexem_node_t *
             {
                 throw "Arguemnt count not matches to definition";
             }
+#if MODERN_COMPILER
             for (auto statement : *node->statements)
             {
                 for (auto lexem : statement)
@@ -237,9 +250,29 @@ static_data_t * namespace_t::CheckLexemeData(type_t * type, Code::lexem_node_t *
                     (*ok->nested).push_back(res);
                 }
             }
+#else
+            Code::statement_list_t::iterator statement;
+            for (
+                statement = node->statements->begin();
+                statement != node->statements->end();
+                ++statement)
+            {
+                Code::lexem_list_t::iterator lexem;
+                for (
+                    lexem = statement->begin();
+                    lexem != statement->end();
+                    ++lexem)
+                {
+                    if (lexem->lexem == lt_comma)
+                        continue;
+                    static_data_t * res = CheckLexemeData(array->child_type, new Code::lexem_node_t(*lexem));
+                    (*ok->nested).push_back(res);
+                }
+            }
+#endif
             break;
         }
-        case type_t::property_t::typedef_type:
+        case type_t::typedef_type:
         {
             typedef_t * def = (typedef_t*)type;
             ok = CheckLexemeData(def->type, node);
@@ -260,6 +293,7 @@ static_data_t * namespace_t::CheckLexemeData(type_t * type, Code::lexem_node_t *
 static_data_t * namespace_t::BraceEncodedStructureInitialization(structure_t * structure, Code::statement_list_t * encoded_data)
 {
     static_data_t * ok = new static_data_t(lt_openblock);
+#if MODERN_COMPILER
     for (auto statement : *encoded_data)
     {
         std::list<variable_base_t*>::iterator var = structure->space->space_variables_list.begin();
@@ -277,6 +311,33 @@ static_data_t * namespace_t::BraceEncodedStructureInitialization(structure_t * s
             }
         }
     }
+#else
+    Code::statement_list_t::iterator   statement;
+    for (
+        statement = encoded_data->begin();
+        statement != encoded_data->end();
+        ++statement)
+    {
+        std::list<variable_base_t*>::iterator var = structure->space->space_variables_list.begin();
+        Code::lexem_list_t::iterator    sequence;
+        for (
+            sequence = statement->begin();
+            sequence != statement->end();
+            ++sequence)
+        {
+            switch (sequence->lexem)
+            {
+            case lt_comma:
+                var++;
+                continue;
+            default:
+                static_data_t * res = CheckLexemeData((*var)->type, &(*sequence));
+                (*ok->nested).push_back(res);
+                continue;
+            }
+        }
+    }
+#endif
     return ok;
 }
 
@@ -295,6 +356,7 @@ static_data_t *  namespace_t::BraceEncodedInitialization(type_t * type, SourcePt
                 static_data_t * ok = new static_data_t(lt_openblock);
                 type_is_pointer++;
                 type = ((array_t*)type)->child_type;
+#if MODERN_COMPILER
                 for (auto statement : *source.statements)
                 {
                     SourcePtr  data_ptr(&statement);
@@ -309,6 +371,26 @@ static_data_t *  namespace_t::BraceEncodedInitialization(type_t * type, SourcePt
                         (*ok->nested).push_back(res);
                     }
                 }
+#else
+                Code::statement_list_t::iterator statement;
+                for (
+                    statement = source.statements->begin();
+                    statement != source.statements->end();
+                    ++statement)
+                {
+                    SourcePtr  data_ptr(&(*statement));
+                    while (data_ptr == true)
+                    {
+                        if (data_ptr.lexem == lt_comma)
+                        {
+                            ++data_ptr;
+                            continue;
+                        }
+                        static_data_t * res = BraceEncodedInitialization(type, data_ptr);
+                        (*ok->nested).push_back(res);
+                    }
+                }
+#endif
                 return ok;
             }
             throw "Fix ASAP - BraceEncodedInitialization";

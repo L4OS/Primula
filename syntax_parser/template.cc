@@ -1,5 +1,9 @@
 #include "namespace.h"
 
+#if ! MODERN_COMPILER
+#include <typeinfo>
+#endif
+
 static namespace_t * expression_space = nullptr;
 
 expression_node_t::expression_node_t(const expression_node_t * node)
@@ -33,22 +37,27 @@ type_t * namespace_t::TryTranslateType(type_t * type)
 {
 	switch (type->prop)
 	{
-	case type_t::property_t::constant_type:
+	case type_t::constant_type:
 	{
 		const_t * t = (const_t*)type;
 		type = TryTranslateType(t->parent_type);
 		break;
 	}
-	case type_t::property_t::pointer_type:
+	case type_t::pointer_type:
 	{
 		pointer_t * t = (pointer_t*)type;
 		type = TryTranslateType(t->parent_type);
 		break;
 	}
-	case type_t::property_t::template_type:
-	case type_t::property_t::compound_type:
+	case type_t::template_type:
+	case type_t::compound_type:
 	{
-		auto pair = instance_types.find(type->name);
+#if MODERN_COMPILER
+        auto pair = instance_types.find(type->name);
+#else
+        std::map<std::string, type_t*>::iterator    pair;
+        pair = instance_types.find(type->name);
+#endif
 		if (pair != instance_types.end())
 		{
 			type = pair->second;
@@ -62,7 +71,7 @@ type_t * namespace_t::TryTranslateType(type_t * type)
 		type = parent->TryTranslateType(type);
 		break;
 	}
-	case type_t::property_t::dimension_type:
+	case type_t::dimension_type:
 	{
 		array_t * array = (array_t*)type;
 		type = TryTranslateType(array->child_type);
@@ -93,6 +102,7 @@ variable_base_t *  namespace_t::TranslateVariable(namespace_t * space, variable_
 	return var;
 }
 
+#if MODERN_COMPILER
 void namespace_t::TranslateNamespace(namespace_t * space, int line_num)
 {
 	type_t * t = nullptr;
@@ -149,6 +159,72 @@ void namespace_t::TranslateNamespace(namespace_t * space, int line_num)
 		}
 	}
 }
+#else
+void namespace_t::TranslateNamespace(namespace_t * space, int line_num)
+{
+    type_t * t = nullptr;
+
+    std::list<class function_parser*>::iterator     parent_function;
+    for (
+        parent_function = space->function_list.begin();
+        parent_function != space->function_list.end();
+        ++parent_function)
+    {
+        function_parser * func = CreateFunctionInstance(*parent_function, line_num);
+        RegisterFunction(func->name, func, true);
+    }
+
+    std::list<statement_t *>::iterator  statement;
+    for (
+        statement = space->space_code.begin();
+        statement != space->space_code.end();
+        ++statement)
+    {
+        switch ((*statement)->type)
+        {
+        case statement_t::_expression:
+            this->space_code.push_back(TranslateExpression(this, (expression_t *)*statement));
+            break;
+
+        case statement_t::_return:
+        {
+            return_t * ret = new return_t;
+            return_t * base = (return_t*)*statement;
+            if (base->return_value != nullptr)
+            {
+                ret->return_value = TranslateExpression(this, base->return_value);
+            }
+            this->space_code.push_back(ret);
+            break;
+        }
+
+        case statement_t::_variable:
+        {
+            variable_base_t * var = TranslateVariable(space, (variable_base_t*)*statement);
+            this->space_code.push_back(var);
+            break;
+        }
+
+        case statement_t::_call:
+        {
+            call_t * call = (call_t*)*statement;
+            this->space_code.push_back(call);
+            break;
+        }
+
+        case statement_t::_if:
+        {
+            operator_IF * op = (operator_IF*)*statement;
+            this->space_code.push_back(op);
+            break;
+        }
+
+        default:
+            throw "template.cc: Add or skip in TranslateNamespace";
+        }
+    }
+}
+#endif
 
 variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t * linkage, SourcePtr & source)
 {
@@ -212,7 +288,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 			{
 				template_structure = (structure_t*)type;
 				instance_structure = new structure_t(template_structure->kind, type->name + "_tm");
-				instance_structure->space = new namespace_t(this, namespace_t::spacetype_t::structure_space, instance_structure->name);
+				instance_structure->space = new namespace_t(this, namespace_t::structure_space, instance_structure->name);
 				instance_structure->space->TranslateNamespace(template_structure->space, source.line_number);
 
 				instance = new variable_base_t(instance_structure->space, instance_structure, source.value, linkage->storage_class);
@@ -258,13 +334,13 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 				instance->declaration = call_constructor;
 				continue;
 			}
-		case lt_semicolon:
-		{
-			linkage_t linkage; // Need take from template!!!
-			CreateVariable(instance->type, instance->name, &linkage);
-			fprintf(stderr, "Declaration in instance of variable '%s%s' completed?\n", name.c_str(), instance->name.c_str());
-			continue;
-		}
+		//case lt_semicolon:
+		//{
+		//	linkage_t linkage; // Need take from template!!!
+		//	CreateVariable(instance->type, instance->name, &linkage);
+		//	fprintf(stderr, "Declaration in instance of variable '%s%s' completed?\n", name.c_str(), instance->name.c_str());
+		//	continue;
+		//}
 		throw "Check if constructor without arguments";
 		break;
 
@@ -277,6 +353,8 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 
 	return instance;
 }
+
+#if MODERN_COMPILER
 
 function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, int line_number)
 {
@@ -399,6 +477,144 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
 	return instance;
 }
 
+#else
+
+function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, int line_number)
+{
+    function_parser	*	instance = nullptr;
+    type_t		*	t;
+
+    t = TryTranslateType(func->type);
+    if (!t)
+    {
+        CreateError(line_number, -7775102, "Cannot find type", func->type->name.c_str());
+        return nullptr;
+    }
+    instance = new function_parser(t, func->name + "_tm");
+    instance->method_type = func->method_type;
+    function_overload_list_t::iterator  overload;
+    for (
+        overload = func->overload_list.begin();
+        overload != func->overload_list.end();
+        ++overload)
+    {
+        function_overload_parser * instance_overload = new function_overload_parser(instance, &(*overload)->linkage);
+        instance_overload->space = new namespace_t(this, namespace_t::function_space, func->name);
+        arg_list_t::iterator    a;
+        for (
+            a = (*overload)->arguments.begin();
+            a != (*overload)->arguments.end();
+            ++a )
+        {
+            t = TryTranslateType(a->type);
+            if (!t)
+            {
+                CreateError(line_number, -7775102, "Cannot find argument type '%s'", a->type->name.c_str());
+                delete instance;
+                instance = nullptr;
+                break;
+            }
+            farg_t		arg(*a);
+            arg.type = t;
+            instance_overload->arguments.push_back(arg);
+        }
+        instance_overload->MangleArguments();
+        instance->overload_list.push_back(instance_overload);
+        if (instance != nullptr)
+            instance_overload->space->TranslateNamespace((*overload)->space, line_number);
+    }
+    return instance;
+}
+
+function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func, SourcePtr & source)
+{
+    function_parser	*	instance = nullptr;
+
+    enum {
+        check_type,
+        wait_delimiter,
+        create_instance,
+        finish
+    } state = check_type;
+
+    type_t * t = nullptr;
+
+    // We need here select best fit function from list of templated functions
+    // But now we just take first
+
+    std::list<farg_t>::iterator arg_ptr;
+    function_overload_list_t::iterator  temp_func;
+    for (
+        temp_func = func->overload_list.begin();
+        temp_func != func->overload_list.end();
+        ++temp_func)
+    {
+        arg_ptr = (*temp_func)->arguments.begin();
+#if MODERN_COMPILER
+        fprintf(stderr, "%s  %x\n", typeid(arg_ptr).name(), typeid(arg_ptr).hash_code());
+#else
+        fprintf(stderr, "%s\n", typeid(arg_ptr).name());
+#endif
+        break;
+    }
+
+    instance_types.clear();
+
+    for (; source != false; source++)
+    {
+        switch (state)
+        {
+        case check_type:
+            t = this->TryLexenForType(source);
+            if (t == nullptr)
+            {
+                CreateError(source.line_number, -7775132, "Unable get type in template ");
+                source.Finish();
+                continue;
+            }
+            state = wait_delimiter;
+            continue;
+
+        case wait_delimiter:
+            switch (source.lexem)
+            {
+            case lt_comma:
+                fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
+                instance_types.insert(std::make_pair(arg_ptr->type->name, t));
+                ++arg_ptr;
+                state = check_type;
+                continue;
+            case lt_more:
+                fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
+                instance_types.insert(std::make_pair(arg_ptr->type->name, t));
+                ++arg_ptr;
+                state = create_instance;
+                continue;
+            default:
+                CreateError(source.line_number, -7775132, "Wrong lexeme (%d) on instance template", source.lexem);
+                source.Finish();
+                continue;
+            }
+            break;
+
+        case create_instance:
+            instance = CreateFunctionInstance(func, source.line_number);
+            fprintf(stderr, "Create function instance form template\n");
+            state = finish;
+            break;
+
+        case finish:
+            fprintf(stderr, "This is function template instance finish\n");
+            break;
+        }
+
+        if (state == finish)
+            break;
+    }
+    return instance;
+}
+#endif
+
 void namespace_t::ParseTemplate(SourcePtr & source)
 {
 	enum {
@@ -413,7 +629,7 @@ void namespace_t::ParseTemplate(SourcePtr & source)
 	std::string			type_name;
 
 	template_t	*	x = new template_t("...to be overriten template name");
-	x->space = new namespace_t(this, namespace_t::spacetype_t::template_space, "...to be overriten template space name");
+	x->space = new namespace_t(this, namespace_t::template_space, "...to be overriten template space name");
 
 	for (; source != false; source != false ? source++ : source)
 	{
@@ -447,7 +663,7 @@ void namespace_t::ParseTemplate(SourcePtr & source)
 				case lt_class:
 				case lt_struct:
 					structure = new structure_t(type_id, type_name);
-					structure->space = x->space->CreateSpace(spacetype_t::structure_space, type_name + "::" + name);
+					structure->space = x->space->CreateSpace(structure_space, type_name + "::" + name);
 					x->space->CreateType(structure, type_name);
 					state = source.lexem == lt_more ? build_template : parameter_type;
 					continue;
@@ -467,13 +683,27 @@ void namespace_t::ParseTemplate(SourcePtr & source)
 				//}
 				x->space->name = source.value;
 			x->space->ParseStatement(source);
-#if true
-			fprintf(stderr, "TODO store template\n");
 
-			for (auto t : x->space->space_types_list)
+            fprintf(stderr, "TODO store template\n");
+
+#if MODERN_COMPILER
+            for (auto t : x->space->space_types_list)
 				this->template_types_map.insert(std::make_pair(t->name, t));
 			for (auto f : x->space->function_list)
 				this->template_function_map.insert(std::make_pair(f->name, f));
+#else
+            std::list<type_t*>::iterator  t;
+            for (
+                t = x->space->space_types_list.begin();
+                t != x->space->space_types_list.end();
+                ++t)
+                this->template_types_map.insert(std::make_pair((*t)->name, *t));
+            std::list<class function_parser*>::iterator   f;
+            for (
+                f = x->space->function_list.begin();
+                f != x->space->function_list.end();
+                ++f)
+                this->template_function_map.insert(std::make_pair((*f)->name, *f));
 #endif
 			fprintf(stderr, "Parse templated object\n");
 			break;

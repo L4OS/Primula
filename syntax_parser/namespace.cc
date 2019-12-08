@@ -1,5 +1,8 @@
 #include "namespace.h"
 #include "lexem_tree_root.h"
+#if ! MODERN_COMPILER
+#  include <stdlib.h>
+#endif
 
 type_t  namespace_t::builtin_types[18] =
 {
@@ -115,17 +118,26 @@ int namespace_t::CheckNamespace(SourcePtr &source)
 		if (source.lexem != lt_openblock)
 			return -1;
 	case lt_openblock:
-		current_space = current_space->CreateSpace(spacetype_t::name_space, spacename);
-		// call to parser namesoace's statements
-		for (auto statement : *source.statements)
-		{
-			current_space->ParseStatement(statement);
-		}
-		fprintf(stderr, "TODO: Register namespace %s\n", spacename.c_str());
-		current_space = current_space->Parent();
-		source++;
-		break;
-
+    {
+        current_space = current_space->CreateSpace(name_space, spacename);
+        // call to parser namesoace's statements
+#if MODERN_COMPILER
+        for (auto statement : *source.statements)
+        {
+            current_space->ParseStatement(statement);
+        }
+#else
+        Code::statement_list_t::iterator statement;
+        for (statement = source.statements->begin(); statement != source.statements->end(); ++statement)
+        {
+            current_space->ParseStatement(*statement);
+        }
+#endif
+        fprintf(stderr, "TODO: Register namespace %s\n", spacename.c_str());
+        current_space = current_space->Parent();
+        source++;
+        break;
+    }
 	default:
 		return -1;
 	}
@@ -135,7 +147,12 @@ int namespace_t::CheckNamespace(SourcePtr &source)
 
 variable_base_t * namespace_t::FindVariable(std::string name)
 {
-	auto pair = space_variables_map.find(name);
+#if MODERN_COMPILER
+    auto pair = space_variables_map.find(name);
+#else
+    std::map<std::string, variable_base_t*>::iterator pair;
+    pair = this->space_variables_map.find(name);
+#endif
 	if (pair == space_variables_map.end())
 	{
 		if (this->type == function_space || this->type == exception_handler_space)
@@ -156,17 +173,36 @@ variable_base_t * namespace_t::FindVariable(std::string name)
 
 function_parser		* namespace_t::FindFunctionInSpace(std::string name)
 {
-	auto pair = function_map.find(name);
+#if MODERN_COMPILER
+    auto pair = function_map.find(name);
+#else
+    std::map<std::string, class function_parser*>::iterator pair;
+    pair = function_map.find(name);
+#endif
 	if (pair != function_map.end())
 		return pair->second;
 	function_parser * f = nullptr;;
-	for (auto inherited_from : this->inherited_from)
+#if MODERN_COMPILER
+    for (auto inherited_from : this->inherited_from)
+    {
+        f = inherited_from->space->FindFunctionInSpace(name);
+        if (f != nullptr)
+            break;
+    }
+#else
+    for
+    (
+        parent_spaces_t::iterator   inherited_from = this->inherited_from.begin(); 
+        inherited_from != this->inherited_from.end(); 
+        ++inherited_from
+    )
 	{
-		f = inherited_from->space->FindFunctionInSpace(name);
+		f = (*inherited_from)->space->FindFunctionInSpace(name);
 		if (f != nullptr)
 			break;
 	}
-	return f;
+#endif
+    return f;
 }
 
 function_parser		* namespace_t::FindFunction(std::string name)
@@ -177,7 +213,12 @@ function_parser		* namespace_t::FindFunction(std::string name)
 
 function_parser		* namespace_t::FindTemplateFunction(std::string name)
 {
-	auto pair = template_function_map.find(name);
+#if MODERN_COMPILER
+    auto pair = template_function_map.find(name);
+#else
+    std::map<std::string, function_parser*>::iterator   pair;
+    pair = template_function_map.find(name);
+#endif
 	if (pair != template_function_map.end())
 		return pair->second;
 	if (this->parent != nullptr)
@@ -187,7 +228,7 @@ function_parser		* namespace_t::FindTemplateFunction(std::string name)
 
 variable_base_t * namespace_t::CreateVariable(type_t * type, std::string name, linkage_t * linkage)
 {
-	auto variable = new variable_base_t(this, type, name, linkage->storage_class);
+    variable_base_t * variable = new variable_base_t(this, type, name, linkage->storage_class);
 	space_variables_map.insert(std::make_pair(name, variable));
 	space_variables_list.push_back(variable);
 	this->space_code.push_back(variable);
@@ -213,7 +254,12 @@ type_t * namespace_t::CreateType(type_t * type, std::string name)
 
 type_t * namespace_t::FindType(std::string name)
 {
-	auto pair = space_types_map.find(name);
+#if MODERN_COMPILER
+    auto pair = space_types_map.find(name);
+#else
+    std::map<std::string, type_t*>::iterator pair;
+    pair = space_types_map.find(name);
+#endif
 	if (pair != space_types_map.end())
 		return pair->second;
 	if (this->parent != nullptr)
@@ -225,12 +271,25 @@ int namespace_t::Parse(Code::statement_list_t source)
 {
 	try
 	{
-		for (Code::lexem_list_t statement : source)
+#if MODERN_COMPILER
+        for (Code::lexem_list_t statement : source)
+        {
+            SourcePtr source(&statement);
+            ParseStatement(source);
+        }
+#else
+        for
+            (
+                Code::statement_list_t::iterator statement = source.begin();
+                statement != source.end();
+                ++statement
+            )
 		{
-			SourcePtr source(&statement);
+			SourcePtr source(&(*statement));
 			ParseStatement(source);
 		}
-	}
+#endif
+    }
 	catch (char * text)
 	{
 		::fprintf(stderr, "namespace exception: %s\n", text);
@@ -312,7 +371,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			}
 			else
 			{
-				CreateError(source.line_number, -7777726, "type '%s' have no space", name);
+				CreateError(source.line_number, -7777726, "type '%s' have no space", name.c_str());
 				source.Finish();
 				return;
 			}
@@ -381,7 +440,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			switch (variable->type->prop)
 			{
 			case type_t::compound_type:
-			case type_t::property_t::pointer_type:
+			case type_t::pointer_type:
 				throw "todo: parse struct and array initialization";
 			default:
 				CreateError(source.line_number, -777776, "Assignment block format error");
@@ -465,7 +524,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		}
 		if (source.lexem == lt_openblock)
 		{
-			if (this->type == spacetype_t::function_space)
+			if (this->type == function_space)
 			{
 				CreateError(source.line_number, -7777774, "function inside function not allowed");
 				source.Finish();
@@ -473,7 +532,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			}
 			if (function->space != nullptr)
 			{
-				CreateError(source.line_number, -77777, "Function '%s' already defined in current namespace", name);
+				CreateError(source.line_number, -77777, "Function '%s' already defined in current namespace", name.c_str());
 				source.Finish();
 				return;
 			}
@@ -530,7 +589,12 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 			}
 			else
 			{	//got index expression
+#if MODERN_COMPILER
 				expression_t * expr = ParseExpression(SourcePtr(source.sequence));
+#else
+                SourcePtr ptr(source.sequence);
+                expression_t * expr = ParseExpression(ptr);
+#endif
 				if (expr == nullptr)
 				{
 					CreateError(source.line_number, -777743, "broken expression in array definition" );
@@ -561,7 +625,11 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 		}
 		else
 		{
+#if MODERN_COMPILER
 			int field_size = std::stoi(source.value);
+#else
+			int field_size = atoi(source.value.c_str());
+#endif
 			type->bitsize = field_size;
 			if (++source == false || source.lexem != lt_semicolon)
 			{
@@ -632,7 +700,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			switch (source.lexem)
 			{
 			case lt_namescope:
-				if (type->prop == type_t::property_t::compound_type)
+				if (type->prop == type_t::compound_type)
 				{
 					structure_t * structure = (structure_t *)type;
 					structure->space->ParseStatement(++source);
@@ -643,7 +711,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				continue;
 
 			case lt_semicolon:
-				if (type->prop != type_t::property_t::compound_type)
+				if (type->prop != type_t::compound_type)
 				{
 					CreateError(source.line_number, -7777774, "stament not define anything");
 					source.Finish();
@@ -676,7 +744,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 
 			case lt_openbraket:
 			{
-				if (this->type != spacetype_t::structure_space)
+				if (this->type != structure_space)
 				{
 					CreateError(source.line_number, -7777774, "function inside function not allowed");
 					source.Finish();
@@ -975,18 +1043,30 @@ int namespace_t::ParseStatement(SourcePtr &source)
 				continue;
 
 			case lt_private:
-				this->current_visibility = visibility_t::vs_private;
+#if MODERN_COMPILER
+                this->current_visibility = visibility_t::vs_private;
+#else
+                this->current_visibility = vs_private;
+#endif
 				source++;
 				state = visibility_colon;
 				break;
 			case lt_protected:
-				this->current_visibility = visibility_t::vs_protected;
-				source++;
+#if MODERN_COMPILER
+                this->current_visibility = visibility_t::vs_protected;
+#else
+                this->current_visibility = vs_protected;
+#endif
+                source++;
 				state = visibility_colon;
 				break;
 			case lt_public:
-				this->current_visibility = visibility_t::vs_public;
-				source++;
+#if MODERN_COMPILER
+                this->current_visibility = visibility_t::vs_public;
+#else
+                this->current_visibility = vs_public;
+#endif
+                source++;
 				state = visibility_colon;
 				break;
 
@@ -1029,12 +1109,23 @@ int namespace_t::ParseStatement(SourcePtr &source)
 
             case lt_openblock:
             {
-                current_space = this->CreateSpace(namespace_t::spacetype_t::codeblock_space, "just_block");
+                current_space = this->CreateSpace(codeblock_space, "just_block");
+#if MODERN_COMPILER
                 // call to parser namesoace's statements
                 for (auto statement : *source.statements)
                 {
                     current_space->ParseStatement(statement);
                 }
+#else
+                Code::statement_list_t::iterator    statement;
+                for(
+                    statement = source.statements->begin(); 
+                    statement != source.statements->end(); 
+                    ++statement)
+                {
+                    current_space->ParseStatement(*statement);
+                }
+#endif
                 codeblock_t * codeblock = new codeblock_t;
                 codeblock->block_space = current_space;
                 current_space = current_space->Parent();
@@ -1053,7 +1144,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					continue;
 				}
 
-				if (linkage.storage_class != linkage_t::storage_class_t::sc_default)
+				if (linkage.storage_class != linkage_t::sc_default)
 				{
 					CreateError(source.line_number, -777745, "type expected for variable declaration (%s)", source.value.c_str());
 #if true  // true for C-ctyle, false for C++ style
@@ -1104,7 +1195,12 @@ int namespace_t::ParseStatement(SourcePtr &source)
 							source.Finish();
 							continue;
 						}
-						call_t * call = function->TryCallFunction(this, SourcePtr(source.sequence));
+#if MODERN_COMPILER
+                        call_t * call = function->TryCallFunction(this, SourcePtr(source.sequence));
+#else
+                        SourcePtr ptr(source.sequence);
+                        call_t * call = function->TryCallFunction(this, ptr);
+#endif
 						this->space_code.push_back(call);
 						source++;
 						continue;
@@ -1114,7 +1210,12 @@ int namespace_t::ParseStatement(SourcePtr &source)
 						function_parser * instance = CreateFunctionFromTemplate(function, ++source);
 						if (source.lexem == lt_openbraket)
 						{
-							call_t	* call = instance->TryCallFunction(this, SourcePtr(source.sequence));
+#if MODERN_COMPILER
+                            call_t	* call = instance->TryCallFunction(this, SourcePtr(source.sequence));
+#else
+                            SourcePtr ptr(source.sequence);
+                            call_t	* call = instance->TryCallFunction(this, ptr);
+#endif
 							this->space_code.push_back(call);
 							source++;
 							continue;
@@ -1133,7 +1234,12 @@ int namespace_t::ParseStatement(SourcePtr &source)
 					{
 						if (source.lexem == lt_openbraket)
 						{
-							call_t * call = function->TryCallFunction(this, SourcePtr(source.sequence));
+#if MODERN_COMPILER
+                            call_t * call = function->TryCallFunction(this, SourcePtr(source.sequence));
+#else
+                            SourcePtr ptr(source.sequence);
+                            call_t * call = function->TryCallFunction(this, ptr);
+#endif
 							this->space_code.push_back(call);
 						}
 						else if (source.lexem == lt_less)
@@ -1183,14 +1289,14 @@ int namespace_t::ParseStatement(SourcePtr &source)
                     space_t * space = this;
                     while (space)
                     {
-                        if (space->type == spacetype_t::function_space)
+                        if (space->type == function_space)
                             break;
                         space = space->parent;
                     }
 					if (space!= nullptr && 
-                        (this->type != spacetype_t::structure_space && 
-                            this->type != spacetype_t::name_space &&
-                            this->type != spacetype_t::template_space) )
+                        (this->type != structure_space && 
+                            this->type != name_space &&
+                            this->type != template_space) )
 					{
 						space_code.push_back(code);
 					}

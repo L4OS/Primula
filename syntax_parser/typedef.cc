@@ -54,7 +54,12 @@ type_t * namespace_t::ParseIndex(SourcePtr & source, type_t * type)
 		type = new pointer_t(type);
 	else
 	{
-		expression_t  * size_expr = ParseExpression(SourcePtr(source.sequence));
+#if MODERN_COMPILER
+        expression_t  * size_expr = ParseExpression(SourcePtr(source.sequence));
+#else
+        SourcePtr ptr(source.sequence);
+        expression_t  * size_expr = ParseExpression(ptr);
+#endif
 		if (size_expr != nullptr && size_expr->is_constant)
 		{
 			constant_node_t	* constant = (constant_node_t *)size_expr->root->constant;
@@ -118,7 +123,7 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				type = TryLexenForType(source);
 				if (type == nullptr)
 				{
-					CreateError(source.line_number, -7777738, "Unparsed typedef construction (%s)", source.value);
+					CreateError(source.line_number, -7777738, "Unparsed typedef construction (%s)", source.value.c_str());
 					source.Finish();
 					continue;
 				}
@@ -273,7 +278,11 @@ type_t * namespace_t::ParseTypeDefinition(SourcePtr &source)
 				linkage_t linkage;
 				function_parser * function_ptr = new function_parser(type, name);
 				function_overload_parser * overload = new function_overload_parser(function_ptr, &linkage);
-				function_ptr->prop = type_t::property_t::funct_ptr_type;
+#if MODERN_COMPILER
+                function_ptr->prop = type_t::property_t::funct_ptr_type;
+#else
+                function_ptr->prop = type_t::funct_ptr_type;
+#endif
 				if(source.sequence->size() > 0)
 					overload->ParseArgunentDefinition(this, source.sequence);
 

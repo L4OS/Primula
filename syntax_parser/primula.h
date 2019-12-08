@@ -1,6 +1,12 @@
 #pragma once
-
+#include <string>
 #include "lexem_tree_root.h"
+
+#if  ! MODERN_COMPILER
+#  if ! defined(nullptr)
+#     define nullptr 0
+#  endif
+#endif
 
 class SourcePtr
 {

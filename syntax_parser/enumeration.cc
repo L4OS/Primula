@@ -1,11 +1,20 @@
 #include "namespace.h"
 
+#if ! MODERN_COMPILER
+# include <stdlib.h>
+#endif
+
 expression_node_t * namespace_t::TryEnumeration(std::string name)
 {
     expression_node_t * node = nullptr;
     if (this->enum_map.count(name) > 0)
     {
+#if MODERN_COMPILER
         auto pair = this->enum_map.find(name);
+#else
+        std::map<std::string, int>::iterator pair;
+        pair = this->enum_map.find(name);
+#endif
         int val = pair->second;
 
         node = new expression_node_t(lt_integer);
@@ -21,9 +30,14 @@ expression_node_t * namespace_t::TryEnumeration(std::string name)
 variable_base_t * namespace_t::TryEnumeration(std::string name, bool self_space)
 {
 	variable_base_t * result = nullptr;
-	for (type_t * space_type : this->space_types_list)
+#if MODERN_COMPILER
+    for (type_t * space_type : this->space_types_list)
+#else
+    std::list<type_t*>::iterator    space_type;
+    for (space_type = space_types_list.begin(); space_type != space_types_list.end(); ++space_type)
+#endif
 	{
-		type_t * type = space_type;
+		type_t * type = *space_type;
 		while (true)
 		{
 			switch (type->prop)
@@ -42,7 +56,12 @@ variable_base_t * namespace_t::TryEnumeration(std::string name, bool self_space)
 		if (type->prop == type_t::enumerated_type)
 		{
 			enumeration_t * en = (enumeration_t*)type;
-			auto pair = en->enumeration.find(name);
+#if MODERN_COMPILER
+            auto pair = en->enumeration.find(name);
+#else
+            std::map<std::string, int>::iterator pair;
+            pair = en->enumeration.find(name);
+#endif
 			if (pair == en->enumeration.end())
 				continue;
 
@@ -61,8 +80,14 @@ static bool TryRegisterEnumeration(namespace_t * space, std::string name, int va
 	bool success = space->enum_map.count(name) == 0;
 	if (success)
 	{
-		auto pair = std::make_pair(name, value);
-		space->enum_map.insert(pair);
+#if MODERN_COMPILER
+        auto pair = std::make_pair(name, value);
+        space->enum_map.insert(pair);
+#else
+        std::pair<std::string, int> pair;
+        pair = std::make_pair(name, value);
+        space->enum_map.insert(pair);
+#endif
 	}
 	else
 	{
@@ -85,43 +110,121 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 	std::string		item_name;
 	int				item_index = 0;
     int             linenum = 0;
-	auto  enumeration = statements->begin();
-	if (enumeration != statements->end())
-		for (auto item : *enumeration)
-		{
+#if MODERN_COMPILER
+    auto  enumeration = statements->begin();
+#else
+    Code::statement_list_t::iterator    enumeration = statements->begin();
+#endif
+    if (enumeration != statements->end())
+    {
+#if MODERN_COMPILER
+        for (auto item : *enumeration)
+            switch (state)
+            {
+            case check_name_state:
+                if (item.lexem != lt_word)
+                {
+                    CreateError(item.line_number, -7777789, "wrong enumeration item name");
+                    return result;
+                }
+                item_name = item.value;
+                state = next_state;
+                linenum = item.line_number;
+                continue;
+
+            case next_state:
+            {
+                if (item.lexem == lt_set)
+                {
+                    state = chageindex_state;
+                    continue;
+                }
+                if (item.lexem != lt_comma)
+                {
+                    CreateError(item.line_number, -7777789, "expected comma");
+                    return result;
+                }
+                bool success = TryRegisterEnumeration(this, item_name, item_index, item.line_number);
+                if (!success)
+                {
+                    return result;
+                }
+                // Add new value to enumeration (does it need for anything except restore source code?)
+                auto pair = std::make_pair(item_name, item_index);
+                result->enumeration.insert(pair);
+                item_name.clear();
+                item_index++;
+                state = check_name_state;
+                continue;
+            }
+
+            case chageindex_state:
+                if (item.lexem == lt_integer)
+                {
+                    item_index = std::stoi(item.value);
+                    state = next_state;
+                    continue;
+                }
+                if (item.lexem == lt_sub)
+                {
+                    state = negative_value_state;
+                    continue;
+                }
+            on_error:
+                CreateError(item.line_number, -7777689, "assign expression to enumerated item value not implemented");
+                return result;
+
+            case negative_value_state:
+                if (item.lexem == lt_integer)
+                {
+                    item_index = -std::stoi(item.value);
+                    state = next_state;
+                    continue;
+                }
+                goto on_error;
+
+            default:
+                throw "Wrong state in enumeration parser";
+            }
+#else
+        Code::lexem_list_t::iterator    item;
+        for (item = enumeration->begin(); item != enumeration->end(); ++item)
+        {
 			switch (state)
 			{
 			case check_name_state:
-				if (item.lexem != lt_word)
+				if (item->lexem != lt_word)
 				{
-					CreateError(item.line_number, -7777789, "wrong enumeration item name");
+					CreateError(item->line_number, -7777789, "wrong enumeration item name");
 					return result;
 				}
-				item_name = item.value;
+				item_name = item->value;
 				state = next_state;
-                linenum = item.line_number;
+                linenum = item->line_number;
 				continue;
 
 			case next_state:
 			{
-				if (item.lexem == lt_set)
+				if (item->lexem == lt_set)
 				{
 					state = chageindex_state;
 					continue;
 				}
-				if (item.lexem != lt_comma)
+				if (item->lexem != lt_comma)
 				{
-					CreateError(item.line_number, -7777789, "expected comma");
+					CreateError(item->line_number, -7777789, "expected comma");
 					return result;
 				}
-				bool success = TryRegisterEnumeration(this, item_name, item_index, item.line_number);
+				bool success = TryRegisterEnumeration(this, item_name, item_index, item->line_number);
 				if (!success)
 				{
 					return result;
 				}
+
 				// Add new value to enumeration (does it need for anything except restore source code?)
-				auto pair = std::make_pair(item_name, item_index);
-				result->enumeration.insert(pair);
+                std::pair<std::string, int> pair;
+                pair = std::make_pair(item_name, item_index);
+                result->enumeration.insert(pair);
 				item_name.clear();
 				item_index++;
 				state = check_name_state;
@@ -129,25 +232,25 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 			}
 
 			case chageindex_state:
-				if (item.lexem == lt_integer)
+				if (item->lexem == lt_integer)
 				{
-					item_index = std::stoi(item.value);
+					item_index = atoi(item->value);
 					state = next_state;
 					continue;
 				}
-				if (item.lexem == lt_sub)
+				if (item->lexem == lt_sub)
 				{
 					state = negative_value_state;
 					continue;
 				}
 			on_error:
-				CreateError(item.line_number, -7777689, "assign expression to enumerated item value not implemented");
+				CreateError(item->line_number, -7777689, "assign expression to enumerated item value not implemented");
 				return result;
 
 			case negative_value_state:
-				if (item.lexem == lt_integer)
+				if (item->lexem == lt_integer)
 				{
-					item_index = -std::stoi(item.value);
+					item_index = -atoi(item->value);
 					state = next_state;
 					continue;
 				}
@@ -157,16 +260,24 @@ type_t * namespace_t::ParseEnumeration(std::string parent_name, Code::statement_
 				throw "Wrong state in enumeration parser";
 			}
 		}
-	// Add last item to enumeration
-	if (item_name.size() > 0)
-	{
-        bool success = TryRegisterEnumeration(this, item_name, item_index, linenum);
-        if (!success)
+#endif
+        // Add last item to enumeration
+        if (item_name.size() > 0)
         {
-            return result;
+            bool success = TryRegisterEnumeration(this, item_name, item_index, linenum);
+            if (!success)
+            {
+                return result;
+            }
+#if MODERN_COMPILER
+            result->enumeration.insert(std::make_pair(item_name, item_index));
+#else
+            std::pair<std::string, int> pair;
+            pair = std::make_pair(item_name, item_index);
+            result->enumeration.insert(pair);
+#endif
         }
-        result->enumeration.insert(std::make_pair(item_name, item_index));
-	}
+    }
 	return result;
 }
 
