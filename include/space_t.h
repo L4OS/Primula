@@ -2,9 +2,14 @@
 
 #include "statement_t.h"
 
+#if MODERN_COMPILER
 struct space_t
+#else
+class space_t
+#endif
 {
-    typedef enum
+public:
+    typedef enum spacetype_t
     {
         global_space,
         name_space,
