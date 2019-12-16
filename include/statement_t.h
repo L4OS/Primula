@@ -88,6 +88,7 @@ public:
 class variable_base_t : public statement_t
 {
 public:
+    int                             access_count;
 	std::string						name;
 	type_t						*	type;
 	class namespace_t			*	space;
@@ -103,6 +104,7 @@ public:
 		linkage_t::storage_class_t storage)
 		: statement_t(statement_t::_variable)
 	{
+        access_count = 0;
 		this->space = space;
 		this->type = type;
 		this->name = name;

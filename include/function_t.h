@@ -38,6 +38,7 @@ typedef std::list<function_overload_t *> function_overload_list_t;
 
 struct function_t : public type_t
 {
+    int                                         access_count;
 	std::string									name;
 	type_t									*	type;
 	function_overload_list_t					overload_list;
@@ -48,6 +49,7 @@ struct function_t : public type_t
 		std::string			name)
 			: type_t(type->name.c_str(), funct_ptr_type, type->bitsize)
 	{
+        access_count = 0;
 		this->name = name;
 		this->type = type;
 		method_type = method;
