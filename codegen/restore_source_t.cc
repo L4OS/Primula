@@ -1,41 +1,73 @@
 #include "restore_source_t.h"
 
-static char NewLine[80];
+bool     restore_source_t::opt_HideUnusedPrototypes;
+
+static char INDENT[80];
 static int	right = 0;
+
+static void MoveIndentRight()
+{
+    INDENT[right] = ' ';
+    right += 4;
+    if (right > sizeof(INDENT) - 1)
+        throw "Block overflow on restoring source code";
+    INDENT[right] = '\0';
+}
+
+static void MoveIndentLeft()
+{
+    INDENT[right] = ' ';
+    right -= 4;
+    if (right < 0)
+        throw "Block underflow on restoring source code";
+    INDENT[right] = '\0';
+}
+
+static void Write(const char * s, ...)
+{
+    va_list args;
+    va_start(args, s);
+    vprintf(s, args);
+    va_end(args);
+}
+
+static void IndentWrite(const char *s, ...)
+{
+    printf(INDENT);
+
+    va_list args;
+    va_start(args, s);
+    vprintf(s, args);
+    va_end(args);
+}
+
 
 static void PrintOpenBlock()
 {
-	printf("\n%s{\n", NewLine);
-	NewLine[right] = ' ';
-	right += 4;
-	if (right > sizeof(NewLine) - 1)
-		throw "Block overflow on restoring source code";
-	NewLine[right] = '\0';
+	IndentWrite("{\n");
+    MoveIndentRight();
 }
 
-static void PrintCloseBlock()
+static void PrintCloseBlock(bool lineFeed)
 {
-	NewLine[right] = ' ';
-	right -= 4;
-	if (right < 0)
-		throw "Block underflow on restoring source code";
-	NewLine[right] = '\0';
-	printf("%s}\n", NewLine);
+    MoveIndentLeft();
+	IndentWrite("}%s", lineFeed ? "\n" : " ");
 }
 
 restore_source_t::restore_source_t()
 {
-	NewLine[0] = '\0';
+    opt_HideUnusedPrototypes = true;
+
+    INDENT[0] = '\0';
 	int i;
-	for (i = 1; i < sizeof(NewLine); ++i)
-		NewLine[i] = ' ';
+	for (i = 1; i < sizeof(INDENT); ++i)
+        INDENT[i] = ' ';
 }
 
 restore_source_t::~restore_source_t()
 {
 }
 
-void GenerateType(type_t * type, bool inlined_only);
 bool GenerateTypeName(type_t * type, const char * name);
 void GenerateExpression(expression_t * exp);
 
@@ -43,17 +75,17 @@ void GenerateCall(call_t * call)
 {
 	if (call -> code == nullptr)
 	{
-		printf("// Parser fault on function call :(\n");
+		Write("// Parser fault on function call :(\n");
 		return;
 	}
 	if (call->code->function->method_type == function_parser::method)
-		printf("%s", call->code->function->name.c_str());
-	printf("(");
+		Write("%s", call->code->function->name.c_str());
+	Write("(");
 #if MODERN_COMPILER
 	for (auto & arg : call->arguments)
 	{
 		GenerateExpression(arg);
-		if (&arg != &call->arguments.back())
+		if (arg != call->arguments.back())
 			printf(", ");
 	}
 #else
@@ -62,10 +94,10 @@ void GenerateCall(call_t * call)
     {
         GenerateExpression(*arg);
         if (&(*arg) != &call->arguments.back())
-            printf(", ");
+            Write(", ");
     }
 #endif
-	printf(")");
+	Write(")");
 }
 
 extern int GetLexemPriority(lexem_type_t  lex);
@@ -113,7 +145,7 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	//}
 
 	if (use_brakets)
-		printf("( ");
+        Write("( ");
 
 	if (n->left)
 		GenerateItem(n->left, my_prio);
@@ -130,7 +162,7 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 		str = "this";
 		break;
 	case lt_variable:
-		printf("%s", n->variable->name.c_str());
+        Write("%s", n->variable->name.c_str());
 		break;
 	case lt_inc:
 		str = "++";
@@ -179,10 +211,10 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 		str = "->";
 		break;
 	case lt_integer:
-		printf("%d", n->constant->integer_value);
+        Write("%d", n->constant->integer_value);
 		break;
 	case lt_string:
-		printf("\"%s\"", n->constant->char_pointer);
+        Write("\"%s\"", n->constant->char_pointer);
 		break;
 	case lt_character:
         PrintCharacter(n->constant->integer_value);
@@ -256,30 +288,30 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 
 	case lt_openindex:
 	{
-		printf(" [ ");
+		Write(" [ ");
 		GenerateItem(n->right);
-		printf(" ] ");
+		Write(" ] ");
 		return;
 	}
 	break;
 
 	case lt_typecasting:
 	{
-		printf("(");
+		Write("(");
 		GenerateTypeName(n->type, nullptr);
-		printf(") ");
+		Write(") ");
 		break;
 	}
 
 	case lt_new:
 	{
-		printf(" new ");
+		Write(" new ");
 		GenerateTypeName(n->type, nullptr);
 		if (n->right != nullptr)
 		{
-			printf("[");
+            Write("[");
 			GenerateItem(n->right);
-			printf("]");
+            Write("]");
 		}
 		return;
 	}
@@ -287,7 +319,7 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	case lt_function_address:
 	{
 		function_parser * function = (function_parser*)n->type;
-		printf("%s;%s", function->name.c_str(), NewLine);
+		Write("%s;", function->name.c_str());
 		break;
 	}
 
@@ -295,7 +327,7 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
     case lt_operator_postdec:
     {
         GenerateItem(n->right);
-        printf(n->lexem == lt_operator_postinc ? "++ " : "-- ");
+        Write(n->lexem == lt_operator_postinc ? "++ " : "-- ");
         return;
     }
 
@@ -305,13 +337,13 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 	}
 
     if (str != nullptr)
-        printf(str);
+        Write(str);
 
 	if (n->right)
 		GenerateItem(n->right, my_prio);
 
 	if (use_brakets)
-		printf(") ");
+        Write(") ");
 }
 
 void GenerateExpression(expression_t * exp)
@@ -338,19 +370,19 @@ bool GenerateTypeName(type_t * type, const char * name)
 			}
 			GenerateTypeName(addres->parent_type, nullptr);
 			if (name)
-				printf("* %s", name);
+				Write("* %s", name);
 			else
-				printf("* ");
+				Write("* ");
 			break;
 		}
 		case type_t::funct_ptr_type:
 		{
 			function_parser * func_ptr = (function_parser*)type;
-			printf("%s", func_ptr->name.c_str());
+			Write("%s", func_ptr->name.c_str());
 			if (name)
-				printf(" %s", name);
+				Write(" %s", name);
 			else
-				printf(" ");
+				Write(" ");
 			break;
 		}
 		case type_t::constant_type:
@@ -360,7 +392,7 @@ bool GenerateTypeName(type_t * type, const char * name)
 			{
 				throw "constant syntax error";
 			}
-			printf("const ");
+			Write("const ");
 			GenerateTypeName(constant->parent_type, name);
 			break;
 		}
@@ -369,9 +401,9 @@ bool GenerateTypeName(type_t * type, const char * name)
 			array_t * array = (array_t*)type;
 			skip_name = GenerateTypeName(array->child_type, name);
 			if (skip_name)
-				printf("[%d] ", array->items_count);
+				Write("[%d] ", array->items_count);
 			else
-				printf("%s [%d] ", name, array->items_count);
+				Write("%s [%d] ", name, array->items_count);
 			skip_name = true;;
 			break;
 		}
@@ -394,32 +426,30 @@ bool GenerateTypeName(type_t * type, const char * name)
 				throw "Non-compound type marked as compound";
 			}
 			if (name)
-				printf("%s %s %s ", compound_name, type->name.c_str(), name);
+				Write("%s %s %s ", compound_name, type->name.c_str(), name);
 			else
-				printf("%s %s ", compound_name, type->name.c_str());
+				Write("%s %s ", compound_name, type->name.c_str());
 			break;
 		}
 
 		case type_t::enumerated_type:
 		{
 			if (name)
-				printf("enum %s %s ", type->name.c_str(), name);
+				Write("enum %s %s ", type->name.c_str(), name);
 			else
-				printf("enum %s ", type->name.c_str());
+				Write("enum %s ", type->name.c_str());
 			break;
 		}
 
 		default:
 			if (name)
-				printf("%s %s ", type->name.c_str(), name);
+				Write("%s %s ", type->name.c_str(), name);
 			else
-				printf("%s ", type->name.c_str());
+				Write("%s ", type->name.c_str());
 		}
 	}
 	return true; // skip_name;
 }
-
-void GenerateSpace(namespace_t * space);
 
 void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false)
 {
@@ -428,7 +458,7 @@ void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false
 	case lt_openblock:
 		//structure_t * structure = (structure_t *)data->nested;
 		if (selfformat)
-			printf("{");
+            Write("{");
 		else
 			PrintOpenBlock();
 #if MODERN_COMPILER
@@ -453,10 +483,10 @@ void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false
             ++compound)
         {
             if (!selfformat)
-                printf("\n%s", NewLine);
+                Write("%s", INDENT);
             if (*compound == nullptr)
             {
-                printf("/* something goes wrong */0, ");
+                Write("/* something goes wrong */ 0");
             }
             else
             {
@@ -466,19 +496,19 @@ void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false
         }
 #endif
         if(selfformat)
-			printf("}");
+            Write("}");
 		else
-			PrintCloseBlock();
+			PrintCloseBlock(false);
 		break;
 	case lt_string:
-		printf("\"%s\"", data->p_char);
+        Write("\"%s\"", data->p_char);
 		break;
 	case lt_integer:
-		printf("%d", data->s_int);
+        Write("%d", data->s_int);
 		break;
 	case lt_openindex:
 		if (data->nested->size() == 0)
-			printf("\n /* Nested data size is not defined */%s", NewLine);
+            Write("\n /* Nested data size is not defined */\n");
 		printf("{ ");
 #if MODERN_COMPILER
         for (auto & term : *data->nested)
@@ -499,274 +529,35 @@ void GenerateStaticData(static_data_t * data, bool last, bool selfformat = false
             }
         }
 #endif
-        printf(" }");
+        Write("}");
 		break;
 	default:
 		throw "Static data type not parsed";
 	}
-	if (!last)
-		printf(", ");
+    if (!last)
+        Write(",\n");
+    else
+        Write("\n");
 }
 
-void GenerateStatement(statement_t * code)
+void restore_source_t::GenerateFunctionOverload(function_overload_t * overload, bool proto)
 {
-	if (code->type == statement_t::_variable)
-	{
-		variable_base_t * var = (variable_base_t *)code;
-		if (var->hide)
-			return;
-	}
-
-	printf(NewLine);
-	switch (code->type)
-	{
-	case statement_t::_return:
-	{
-		return_t  * ret_code = (return_t*)code;
-		expression_t * value = ret_code->return_value;
-		printf("return ");
-		if (value)
-			GenerateExpression(value);
-		break;
-	}
-
-	case statement_t::_call:
-	{
-		GenerateCall((call_t*)code);
-		break;
-	}
-
-	case statement_t::_expression:
-	{
-		expression_t * expr = (expression_t*)code;
-		if (expr->root == nullptr)
-			printf("%s// !!! empty expression !!!\n", NewLine);
-		else
-		{
-			GenerateExpression(expr);
-		}
-		break;
-	}
-
-	case statement_t::_do:
-	{
-		operator_DO * op = (operator_DO*)code;
-		printf("do");
-		GenerateStatement(op->body);
-		printf("while(");
-		GenerateExpression(op->expression);
-		printf(");\n");
-		return;
-	}
-
-	case statement_t::_while:
-	{
-		operator_WHILE * op = (operator_WHILE*)code;
-		printf("while( ");
-		GenerateExpression(op->expression);
-		printf(" )");
-		GenerateStatement(op->body);
-		return;
-	}
-
-	case statement_t::_if:
-	{
-		operator_IF * op = (operator_IF*)code;
-		printf("if(");
-        if (op->expression == nullptr)
-            printf("/* error expression parsing */");
-        else
-		    GenerateExpression(op->expression);
-		printf(")");
-        if (op->true_statement == nullptr)
-        {
-            printf("/* true 'if' statements lost */\n");
-        }
-        else
-        {
-            bool block = (op->true_statement->type == statement_t::_codeblock);
-            if (!block)
-                printf("\n    ");
-            GenerateStatement(op->true_statement);
-        }
-
-		if (op->false_statement != nullptr)
-		{
-			printf("%selse\n", NewLine);
-			GenerateStatement(op->false_statement);
-		}
-		return;
-	}
-
-	case statement_t::_switch:
-	{
-		operator_SWITCH * op = (operator_SWITCH*)code;
-		printf("switch(");
-		GenerateExpression(op->expression);
-		printf(")");
-		PrintOpenBlock();
-		GenerateSpace(op->body);
-		PrintCloseBlock();
-		return;
-	}
-
-	case statement_t::_case:
-	{
-		operator_CASE * op = (operator_CASE *)code;
-		printf("case %d:\n", op->case_value);
-		return;
-	}
-
-	case statement_t::_continue:
-		printf("continue");
-		break;
-
-	case statement_t::_break:
-		printf("break");
-		break;
-
-	case statement_t::_default:
-		printf("default:\n");
-		return;
-
-	case statement_t::_goto:
-	{
-		operator_GOTO * op = (operator_GOTO*)code;
-		printf("goto %s", op->label.c_str());
-		break;
-	}
-	case statement_t::_label:
-	{
-		operator_LABEL * op = (operator_LABEL*)code;
-		printf("%s:\n", op->label.c_str());
-		return;
-	}
-	case statement_t::_delete:
-	{
-		operator_DELETE * op = (operator_DELETE*)code;
-		printf("delete %s %s", op->as_array ? "[]" : "", op->var->name.c_str());
-		break;
-	}
-	case statement_t::_variable:
-	{
-		variable_base_t * var = (variable_base_t *)code;
-		switch (var->storage)
-		{
-		case linkage_t::sc_extern:
-			printf("extern ");
-			break;
-		case linkage_t::sc_static:
-			printf("static ");
-			break;
-		case linkage_t::sc_register:
-			printf("register ");
-			break;
-		}
-		if (var->type->name.size() > 0)
-			GenerateTypeName(var->type, (char*)var->name.c_str());
-		else
-		{
-			// Unnamed structure - draw full type
-			GenerateType(var->type, true);
-			printf(" %s", var->name.c_str());
-		}
-		if (var->declaration != nullptr)
-		{
-			switch (var->declaration->type)
-			{
-			case statement_t::_expression:
-				printf("= ");
-				GenerateExpression((expression_t*)var->declaration);
-				break;
-			case statement_t::_call:
-				GenerateCall((call_t*)var->declaration);
-				break;
-			default:
-				throw "Unparsed type of varibale declaration";
-			}
-		}
-		if (var->static_data != nullptr)
-		{
-			printf(" = ");
-			GenerateStaticData(var->static_data, true);
-		}
-		break;
-	}
-	case statement_t::_for:
-	{
-		operator_FOR * op = (operator_FOR *)code;
-		printf("for( ");
-		if (op->init_type)
-			GenerateTypeName(op->init_type, nullptr);
-		if (op->init != nullptr)
-			GenerateExpression(op->init);
-		printf("; ");
-		if (op->condition != nullptr)
-			GenerateExpression(op->condition);
-		printf("; ");
-		if (op->iterator != nullptr)
-			GenerateExpression(op->iterator);
-		printf(")");
-		PrintOpenBlock();
-		GenerateSpace(op->body);
-		PrintCloseBlock();
-		return;
-	}
-	case statement_t::_codeblock:
-	{
-		PrintOpenBlock();
-		codeblock_t * op = (codeblock_t*)code;
-		GenerateSpace(op->block_space);
-		PrintCloseBlock();
-		return;
-	}
-	case statement_t::_trycatch:
-	{
-		operator_TRY * op = (operator_TRY*)code;
-		printf("try ");
-		PrintOpenBlock();
-		GenerateSpace(op->body);
-		PrintCloseBlock();
-		printf("%scatch( ", NewLine);
-		GenerateTypeName(op->type, op->exception.c_str());
-		//printf(op->exception.c_str());
-		printf(") ");
-		PrintOpenBlock();
-		GenerateSpace(op->handler->space);
-		PrintCloseBlock();
-		return;
-	}
-	case statement_t::_throw:
-	{
-		operator_THROW * op = (operator_THROW *)code;
-		printf("throw \"%s\"", op->exception_constant->char_pointer);
-		break;
-	}
-	default:
-		throw "Not parsed statement type";
-	}
-	printf(";\n");
-
-}
-
-void GenerateFunctionOverload(function_overload_t * overload, bool proto)
-{
-	printf(NewLine);
+	Write(INDENT);
 
 	switch (overload->linkage.storage_class)
 	{
 	case linkage_t::sc_extern:
-		printf("extern ");
+		Write("extern ");
 		break;
 	case linkage_t::sc_static:
-		printf("static ");
+        Write("static ");
 		break;
 	case linkage_t::sc_abstract:
 	case linkage_t::sc_virtual:
-		printf("virtual ");
+        Write("virtual ");
 		break;
 	case linkage_t::sc_inline:
-		printf("inline ");
+        Write("inline ");
 		break;
 	}
 	switch (overload->function->method_type)
@@ -775,12 +566,10 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
 		GenerateTypeName(overload->function->type, nullptr);
 		break;
 	case function_parser::constructor:
-		printf("// Constructor\n");
-		printf(NewLine);
+		Write("// Constructor\n%s", INDENT);
 		break;
 	case function_parser::destructor:
-		printf("// Desctructor\n");
-		printf(NewLine);
+		Write("// Desctructor\n%s", INDENT);
 		break;
 	}
 	if (!proto)
@@ -791,10 +580,10 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
 				(overload->space->parent->type == space_t::structure_space) &&
 				(overload->linkage.storage_class != linkage_t::sc_inline))
 			{
-				printf("%s", overload->space->parent->name.c_str());
+				Write("%s", overload->space->parent->name.c_str());
 			}
 	}
-	printf("%s (", overload->function->name.c_str());
+	Write("%s(", overload->function->name.c_str());
 #if MODERN_COMPILER
     for (farg_t & arg : overload->arguments)
 	{
@@ -818,28 +607,28 @@ void GenerateFunctionOverload(function_overload_t * overload, bool proto)
         {
             GenerateTypeName(arg->type, (char*)arg->name.c_str());
             if (&(*arg) != &overload->arguments.back())
-                printf(", ");
+                Write(", ");
         }
         else
-            printf("...");
+            Write("...");
     }
 #endif
-	printf(")");
+	Write(")");
 	if (overload->space != nullptr && !proto)
 	{
-		printf("%s", NewLine);
+		Write("\n");
 		PrintOpenBlock();
-		if (overload->space->space_code.size() > 0)
-			GenerateSpace(overload->space);
-		PrintCloseBlock();
+		if (overload->space && overload->space->space_code.size() > 0)
+            ((restore_source_t*)overload->space)->GenerateSpace();
+		PrintCloseBlock(true);
 	}
 	else if (overload->linkage.storage_class == linkage_t::sc_abstract)
-		printf(" = 0;\n");
+		Write(" = 0;\n");
 	else
-		printf(";\n");
+		Write(";\n");
 }
 
-void GenerateFunction(function_parser * f, bool proto)
+void restore_source_t::GenerateFunction(function_parser * f, bool proto)
 {
 #if MODERN_COMPILER
     for (function_overload_t * overload : f->overload_list)
@@ -853,31 +642,43 @@ void GenerateFunction(function_parser * f, bool proto)
         overload != f->overload_list.end();
         ++overload)
     {
-        GenerateFunctionOverload(*overload, proto);
+        if (!opt_HideUnusedPrototypes || (*overload)->function->access_count > 0)
+            GenerateFunctionOverload(*overload, proto);
+        //else
+        //{
+        //    printf("// ");
+        //    GenerateFunctionOverload(*overload, proto);
+        //}
     }
+    if(!proto)
+        Write("\n");
 #endif
 }
 
-void GenerateType(type_t * type, bool inlined_only)
+void restore_source_t::GenerateType(type_t * type, bool inlined_only)
 {
-	if (type->prop == type_t::template_type)
+    switch (type->prop)
+    {
+    case type_t::template_type:
 	{
-		printf("%stemplate<class %s>%s", NewLine, type->name.c_str(), "FiXME");
+		Write("template<class %s>%s", type->name.c_str(), "FiXME");
 		template_t * temp = (template_t *)type;
-		GenerateSpace(temp->space);
+        ((restore_source_t*)temp->space)->GenerateSpace();
 		printf(" ");
+        break;
 	}
-	else if (type->prop == type_t::pointer_type)
+    case type_t::pointer_type:
 	{
-		printf(" * ");
+		Write(" * ");
 		pointer_t * op = (pointer_t*)type;
 		GenerateType(op->parent_type, inlined_only);
+        break;
 	}
-	else if (type->prop == type_t::funct_ptr_type)
+    case type_t::funct_ptr_type:
 	{
 		function_parser * func_ptr = (function_parser*)type;
 		GenerateTypeName(func_ptr->type, nullptr);
-		printf("%s(", func_ptr->name.c_str());
+		Write("%s(", func_ptr->name.c_str());
 #if MODERN_COMPILER
 		for (auto func : func_ptr->overload_list)
 		{
@@ -905,19 +706,20 @@ void GenerateType(type_t * type, bool inlined_only)
             {
                 GenerateTypeName(arg->type, arg->name.c_str());
                 if (&arg != &(*func)->arguments.begin())
-                    printf(", ");
+                    Write(", ");
             }
         }
 #endif
-		printf(")");
+		Write(")");
+        break;
 	}
-	else if (type->prop == type_t::compound_type)
+    case type_t::compound_type:
 	{
 		structure_t * compound_type = (structure_t*)type;
 		GenerateTypeName(type, nullptr);
 		if (compound_type->space->inherited_from.size() > 0)
 		{
-			printf(": ");
+			Write(": ");
 #if MODERN_COMPILER
             for (auto & inherited_from : compound_type->space->inherited_from)
 			{
@@ -931,18 +733,18 @@ void GenerateType(type_t * type, bool inlined_only)
                 inherited_from != compound_type->space->inherited_from.end();
                 ++inherited_from)
             {
-                printf("%s", (*inherited_from)->name.c_str());
-                printf(&(*inherited_from) != &compound_type->space->inherited_from.back() ? ", " : " ");
+                Write("%s", (*inherited_from)->name.c_str());
+                Write(&(*inherited_from) != &compound_type->space->inherited_from.back() ? ", " : " ");
             }
 #endif
         }
 		PrintOpenBlock();
-		GenerateSpace(compound_type->space);
+		((restore_source_t*)compound_type->space)->GenerateSpace();
 		if (inlined_only)
-			printf("} ");
+            Write("} ");
 		else
 		{
-			PrintCloseBlock();
+			PrintCloseBlock(false);
 			// Definition Outside class declaration
 #if MODERN_COMPILER
             for (auto f : compound_type->space->function_list)
@@ -968,11 +770,12 @@ void GenerateType(type_t * type, bool inlined_only)
             }
 #endif
 		}
+        break;
 	}
-	else if (type->prop == type_t::enumerated_type)
+    case type_t::enumerated_type:
 	{
 		enumeration_t * en = (enumeration_t*)type;
-		printf("enum %s ", type->name.c_str());
+		Write("enum %s ", type->name.c_str());
 		PrintOpenBlock();
 		int idx = 0;
 #if MODERN_COMPILER
@@ -995,34 +798,36 @@ void GenerateType(type_t * type, bool inlined_only)
             ++item)
         {
             if (item->second == idx)
-                printf("%s%s,\n", NewLine, item->first.c_str());
+                IndentWrite("%s,\n", item->first.c_str());
             else
             {
                 idx = item->second;
-                printf("%s%s = %d,\n", NewLine, item->first.c_str(), idx);
+                IndentWrite("%s = %d,\n", item->first.c_str(), idx);
             }
             ++idx;
         }
 #endif
 		if (inlined_only)
-			printf("} ");
+			Write("} ");
 		else
-			PrintCloseBlock();
+			PrintCloseBlock(false);
+        break;
 	}
-	else if (type->prop == type_t::dimension_type)
+    case type_t::dimension_type:
 	{
 		array_t * array = (array_t*)type;
 		GenerateTypeName(array->child_type, nullptr);
-		printf("[%d] ", array->items_count);
+		Write("[%d] ", array->items_count);
+        break;
 	}
-	else if (type->prop == type_t::typedef_type)
+    case type_t::typedef_type:
 	{
 		typedef_t * def = (typedef_t *)type;
-		printf("%stypedef ", NewLine);
+		IndentWrite("typedef ");
 		if (def->type->prop != type_t::enumerated_type)
 		{
 			GenerateType(def->type, false);
-			printf("%s%s;\n", NewLine, type->name.c_str());
+            IndentWrite("%s;\n", type->name.c_str());
 		}
 		else
 		{
@@ -1030,23 +835,356 @@ void GenerateType(type_t * type, bool inlined_only)
 				GenerateTypeName(def->type, type->name.c_str());
 			else
 			{
-				GenerateType(def->type, true);
-				printf(" %s", type->name.c_str());
+				GenerateType(def->type, false);
+				Write(" %s", type->name.c_str());
 			}
-			printf(";\n");
+			Write(";\n");
 		}
+        break;
 	}
-	else if (type->prop == type_t::auto_type)
+    case type_t::auto_type:
 	{
-		printf("/* AUTO */");
+		Write("/* AUTO */");
+        break;
 	}
-	else
+    default:
 	{
 		throw "\n--------- TODO: Fix source generator ---------\n";
 	}
+    }
 }
 
-void GenerateSpace(namespace_t * space)
+void restore_source_t::GenerateStatement(statement_t * code)
+{
+    if (code->type == statement_t::_variable)
+    {
+        variable_base_t * var = (variable_base_t *)code;
+        if (var->hide)
+            return;
+    }
+
+    switch (code->type)
+    {
+    case statement_t::_return:
+    {
+        return_t  * ret_code = (return_t*)code;
+        expression_t * value = ret_code->return_value;
+        IndentWrite("return ");
+        if (value)
+            GenerateExpression(value);
+        break;
+    }
+
+    case statement_t::_call:
+    {
+        Write(INDENT);
+        GenerateCall((call_t*)code);
+        break;
+    }
+
+    case statement_t::_expression:
+    {
+        expression_t * expr = (expression_t*)code;
+        if (expr->root == nullptr)
+            Write("// !!! empty expression !!!\n");
+        else
+        {
+            Write(INDENT);
+            GenerateExpression(expr);
+        }
+        break;
+    }
+
+    case statement_t::_do:
+    {
+        operator_DO * op = (operator_DO*)code;
+        IndentWrite("do\n");
+        MoveIndentRight();
+        GenerateStatement(op->body);
+        MoveIndentLeft();
+        IndentWrite("while(");
+        GenerateExpression(op->expression);
+        Write(");\n");
+        return;
+    }
+
+    case statement_t::_while:
+    {
+        operator_WHILE * op = (operator_WHILE*)code;
+        IndentWrite("while( ");
+        GenerateExpression(op->expression);
+        Write(" )\n");
+        bool blocked = op->body->type == statement_t::_codeblock;
+        if(!blocked)
+            MoveIndentRight();
+        GenerateStatement(op->body);
+        if (!blocked)
+            MoveIndentLeft();
+        return;
+    }
+
+    case statement_t::_if:
+    {
+        operator_IF * op = (operator_IF*)code;
+        IndentWrite("if(");
+        if (op->expression == nullptr)
+            Write("/* error expression parsing */");
+        else
+            GenerateExpression(op->expression);
+        Write(")\n");
+        if (op->true_statement == nullptr)
+        {
+            Write("/* true 'if' statements lost */\n");
+        }
+        else
+        {
+            bool block = op->true_statement->type == statement_t::_codeblock;
+            if (!block)
+                MoveIndentRight();
+            GenerateStatement(op->true_statement);
+            if (!block)
+                MoveIndentLeft();
+        }
+
+        if (op->false_statement != nullptr)
+        {
+            IndentWrite("else\n");
+            bool block = op->false_statement->type == statement_t::_codeblock;
+            if(!block)
+                MoveIndentRight();
+            GenerateStatement(op->false_statement);
+            if (!block)
+                MoveIndentLeft();
+        }
+        return;
+    }
+
+    case statement_t::_switch:
+    {
+        operator_SWITCH * op = (operator_SWITCH*)code;
+        IndentWrite("switch(");
+        GenerateExpression(op->expression);
+        Write(")\n");
+        PrintOpenBlock();
+        ((restore_source_t*)op->body)->GenerateSpace();
+        PrintCloseBlock(true);
+        return;
+    }
+
+    case statement_t::_case:
+    {
+        operator_CASE * op = (operator_CASE *)code;
+        IndentWrite("case %d:\n", op->case_value);
+        return;
+    }
+
+    case statement_t::_continue:
+        IndentWrite("continue");
+        break;
+
+    case statement_t::_break:
+        IndentWrite("break");
+        break;
+
+    case statement_t::_default:
+        IndentWrite("default:\n");
+        return;
+
+    case statement_t::_goto:
+    {
+        operator_GOTO * op = (operator_GOTO*)code;
+        IndentWrite("goto %s", op->label.c_str());
+        break;
+    }
+    case statement_t::_label:
+    {
+        operator_LABEL * op = (operator_LABEL*)code;
+        IndentWrite("%s:\n", op->label.c_str());
+        return;
+    }
+    case statement_t::_delete:
+    {
+        operator_DELETE * op = (operator_DELETE*)code;
+        IndentWrite("delete %s %s", op->as_array ? "[]" : "", op->var->name.c_str());
+        break;
+    }
+    case statement_t::_variable:
+    {
+        variable_base_t * var = (variable_base_t *)code;
+        Write(INDENT);
+        switch (var->storage)
+        {
+        case linkage_t::sc_extern:
+            Write("extern ");
+            break;
+        case linkage_t::sc_static:
+            Write("static ");
+            break;
+        case linkage_t::sc_register:
+            Write("register ");
+            break;
+        }
+        if (var->type->name.size() > 0)
+            GenerateTypeName(var->type, (char*)var->name.c_str());
+        else
+        {
+            // Unnamed structure - draw full type
+            GenerateType(var->type, true);
+            Write(" %s", var->name.c_str());
+        }
+        if (var->declaration != nullptr)
+        {
+            switch (var->declaration->type)
+            {
+            case statement_t::_expression:
+                Write("= ");
+                GenerateExpression((expression_t*)var->declaration);
+                break;
+            case statement_t::_call:
+                GenerateCall((call_t*)var->declaration);
+                break;
+            default:
+                throw "Unparsed type of varibale declaration";
+            }
+        }
+        if (var->static_data != nullptr)
+        {
+            printf(" = ");
+            GenerateStaticData(var->static_data, true);
+        }
+        break;
+    }
+    case statement_t::_for:
+    {
+        operator_FOR * op = (operator_FOR *)code;
+        IndentWrite("for( ");
+        if (op->init_type)
+            GenerateTypeName(op->init_type, nullptr);
+        if (op->init != nullptr)
+            GenerateExpression(op->init);
+        Write("; ");
+        if (op->condition != nullptr)
+            GenerateExpression(op->condition);
+        Write("; ");
+        if (op->iterator != nullptr)
+            GenerateExpression(op->iterator);
+        Write(")\n");
+        PrintOpenBlock();
+        if (op->body != nullptr)
+            ((restore_source_t*)op->body)->GenerateSpace();
+        PrintCloseBlock(true);
+        return;
+    }
+    case statement_t::_codeblock:
+    {
+        PrintOpenBlock();
+        codeblock_t * op = (codeblock_t*)code;
+        ((restore_source_t*)op->block_space)->GenerateSpace();
+        PrintCloseBlock(true);
+        return;
+    }
+    case statement_t::_trycatch:
+    {
+        operator_TRY * op = (operator_TRY*)code;
+        IndentWrite("try ");
+        PrintOpenBlock();
+        if (op->body != nullptr)
+            ((restore_source_t*)op->body)->GenerateSpace();
+        PrintCloseBlock(true);
+        IndentWrite("catch( ");
+        GenerateTypeName(op->type, op->exception.c_str());
+        //printf(op->exception.c_str());
+        Write(")\n");
+        PrintOpenBlock();
+        if (op->handler->space != nullptr)
+            ((restore_source_t*)op->handler->space)->GenerateSpace();
+        PrintCloseBlock(true);
+        return;
+    }
+    case statement_t::_throw:
+    {
+        operator_THROW * op = (operator_THROW *)code;
+        IndentWrite("throw \"%s\"", op->exception_constant->char_pointer);
+        break;
+    }
+    default:
+        throw "Not parsed statement type";
+    }
+    Write(";\n");
+}
+
+void restore_source_t::GenerateFunctionPrototypes()
+{
+    std::list<class function_parser*>::iterator f;
+    for (f = function_list.begin(); f != function_list.end(); ++f)
+    {
+        GenerateFunction(*f, true);
+    }
+}
+
+void restore_source_t::GenerateSpaceTypes()
+{
+    if (space_types_list.size() > 0)
+    {
+        std::list<type_t*>::iterator type;
+        for (
+            type = space_types_list.begin();
+            type != space_types_list.end();
+            ++type)
+        {
+            GenerateType(*type, false);
+            Write("\n");
+        }
+    }
+}
+
+void restore_source_t::GenerateSpaceCode()
+{
+    /* Do variables declaration as statements */
+    if (space_code.size() > 0)
+    {
+        //		printf("/* Code definitions */\n");
+        std::list<statement_t *>::iterator code;
+        for (
+            code = space_code.begin();
+            code != space_code.end();
+            ++code)
+        {
+            GenerateStatement(*code);
+        }
+    }
+}
+
+void restore_source_t::GenerateSpaceFunctions()
+{
+    if (function_list.size() > 0)
+    {
+        std::list<class function_parser*>::iterator f;
+        for ( f = function_list.begin(); f != function_list.end(); ++f)
+        {
+            function_overload_list_t::iterator overload;
+            for (
+                overload = (*f)->overload_list.begin();
+                overload != (*f)->overload_list.end();
+                ++overload)
+            {
+                if ((*overload)->linkage.storage_class == linkage_t::sc_inline || this->type != space_t::structure_space)
+                {
+                    if ((*overload)->space != nullptr)
+                    {
+                        bool proto = false;
+                        if ((*overload)->space->parent->type == space_t::structure_space)
+                            proto = (*overload)->linkage.storage_class != linkage_t::sc_inline;
+                        GenerateFunctionOverload(*overload, proto);
+                        Write("\n");
+                    }
+                }
+            }
+        }
+    }
+}
+
+void restore_source_t::GenerateSpace()
 {
 #if MODERN_COMPILER
     for (auto f : space->function_list)
@@ -1086,73 +1224,14 @@ void GenerateSpace(namespace_t * space)
             }
     }
 #else
-    std::list<class function_parser*>::iterator f;
-    for (
-        f = space->function_list.begin();
-        f != space->function_list.end();
-        ++f)
-        //		if (f->space == nullptr)
-        GenerateFunction(*f, true);
-    if (space->space_types_list.size() > 0)
-    {
-        //		printf("/* Space type definitions '%s' */\n", space->name.c_str());
-        std::list<type_t*>::iterator type;
-        for (
-            type = space->space_types_list.begin();
-            type != space->space_types_list.end();
-            ++type)
-        {
-            GenerateType(*type, false);
-        }
-    }
-
-    /* Do variables declaration as statements */
-    if (space->space_code.size() > 0)
-    {
-        //		printf("/* Code definitions */\n");
-        std::list<statement_t *>::iterator code;
-        for (
-            code = space->space_code.begin();
-            code != space->space_code.end();
-            ++code)
-        {
-            GenerateStatement(*code);
-        }
-    }
-
-    if (space->function_list.size() > 0)
-    {
-        //		printf("/* Method definitions */\n");
-        std::list<class function_parser*>::iterator f;
-        for (
-            f = space->function_list.begin();
-            f != space->function_list.end();
-            ++f)
-        {
-            function_overload_list_t::iterator overload;
-            for (
-                overload = (*f)->overload_list.begin();
-                overload != (*f)->overload_list.end();
-                ++overload)
-            {
-                if ((*overload)->linkage.storage_class == linkage_t::sc_inline || space->type != space_t::structure_space)
-                {
-                    if ((*overload)->space != nullptr)
-                    {
-                        bool proto = false;
-                        if ((*overload)->space->parent->type == space_t::structure_space)
-                            proto = (*overload)->linkage.storage_class != linkage_t::sc_inline;
-                        GenerateFunctionOverload(*overload, proto);
-                    }
-                }
-            }
-        }
-    }
+    this->GenerateSpaceTypes();
+    this->GenerateFunctionPrototypes();
+    this->GenerateSpaceCode();
+    this->GenerateSpaceFunctions();
 #endif
-
 }
 
 void restore_source_t::GenerateCode(namespace_t * space)
 {
-	::GenerateSpace(space);
+    ((restore_source_t*)space)->GenerateSpace();
 }
