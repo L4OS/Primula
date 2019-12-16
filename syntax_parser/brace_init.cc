@@ -411,7 +411,8 @@ static_data_t *  namespace_t::BraceEncodedInitialization(type_t * type, SourcePt
             Code::lexem_node_t  node;
             node.lexem = source.lexem;
             node.line_number = source.line_number;
-            node.value = source.value.c_str();
+            node.value = new char[source.value.length()+1];
+            strcpy((char*) node.value, source.value.c_str());
             static_data_t * res = CheckLexemeData(type, &node);
             source++;
             return res;

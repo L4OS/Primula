@@ -158,16 +158,23 @@ variable_base_t * namespace_t::FindVariable(std::string name)
 		if (this->type == function_space || this->type == exception_handler_space)
 		{
 			variable_base_t * arg = owner_function->FindArgument(name);
-			if (arg != nullptr)
-				return arg;
+            if (arg != nullptr)
+            {
+                ++arg->access_count;
+                return arg;
+            }
 		}
 		variable_base_t * enumeration = TryEnumeration(name, true);
-		if (enumeration != nullptr)
-			return enumeration;
+        if (enumeration != nullptr)
+        {
+            ++enumeration->access_count;
+            return enumeration;
+        }
 		if (this->parent == nullptr)
 			return nullptr;
 		return parent->FindVariable(name);
 	}
+    ++pair->second->access_count;
 	return pair->second;
 }
 
@@ -175,14 +182,12 @@ function_parser		* namespace_t::FindFunctionInSpace(std::string name)
 {
 #if MODERN_COMPILER
     auto pair = function_map.find(name);
-#else
-    std::map<std::string, class function_parser*>::iterator pair;
-    pair = function_map.find(name);
-#endif
-	if (pair != function_map.end())
-		return pair->second;
-	function_parser * f = nullptr;;
-#if MODERN_COMPILER
+    if (pair != function_map.end())
+    {
+        ++pair->second->access_count;
+        return pair->second;
+    }
+    function_parser * f = nullptr;;
     for (auto inherited_from : this->inherited_from)
     {
         f = inherited_from->space->FindFunctionInSpace(name);
@@ -190,6 +195,15 @@ function_parser		* namespace_t::FindFunctionInSpace(std::string name)
             break;
     }
 #else
+    std::map<std::string, class function_parser*>::iterator pair;
+    pair = function_map.find(name);
+    if (pair != function_map.end())
+    {
+        ++pair->second->access_count;
+        return pair->second;
+    }
+    function_parser * f = nullptr;;
+
     for
     (
         parent_spaces_t::iterator   inherited_from = this->inherited_from.begin(); 

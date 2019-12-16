@@ -76,8 +76,13 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 
 #include "namespace.h"
 #include "../codegen/restore_source_t.h"
+#include "../codegen/Pascal/pascal_generator.h"
 
+#if true
 restore_source_t			global_space;
+#else
+PascalGenerator             global_space;
+#endif
 
 extern void InitialNamespace(namespace_t * space);
 
@@ -100,7 +105,7 @@ int main(int argc, char * argv[])
 
 	fclose(f);
 
-	fprintf(stderr, "------------- Starting syntax parsing ------------------\n");
+	fprintf(stderr, "------------- Syntax parsing started------------------\n");
 
 	InitialNamespace(&global_space);
 	global_space.Parse(result);
