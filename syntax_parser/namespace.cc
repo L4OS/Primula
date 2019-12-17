@@ -727,7 +727,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			case lt_semicolon:
 				if (type->prop != type_t::compound_type)
 				{
-					CreateError(source.line_number, -7777774, "stament not define anything");
+					CreateError(source.line_number, -7777774, "statement not define anything");
 					source.Finish();
 					continue;
 				}

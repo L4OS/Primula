@@ -1300,9 +1300,10 @@ expression_node_t * FixConstants(expression_node_t * node)
 			throw "Check operation";
 		}
 
-		node->constant = new constant_node_t(val);
+        node->constant = new constant_node_t(val);
 		node->lexem = lt_integer;
-	}
+        node->is_constant = true;
+    }
 
 	if (node->constant != nullptr)
 	{
@@ -1336,6 +1337,7 @@ expression_t  * namespace_t::ParseExpression(SourcePtr &source)
     {
         expression->root = FixConstants(expression->root);
         expression->type = expression->root->type;
+        expression->is_constant = expression->root->is_constant;
     }
 	return expression;
 }
