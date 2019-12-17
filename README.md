@@ -26,6 +26,10 @@ Please use the [Issues](https://github.com/L4OS/Primula/issues) section for bug 
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
+## License
+
+Licensed under the Apache License, Version 2.0.
+
 ## Resources
 
 [Primula Home Site (in Russian)](http://primula.l4os.ru/ "Click for visiting the Primula Home Site")
