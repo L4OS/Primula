@@ -93,7 +93,16 @@ type_t * namespace_t::ParseCompoundDefinition(std::string parent_name, lexem_typ
     {
         for (overload = (*function)->overload_list.begin(); overload != (*function)->overload_list.end(); ++overload)
         {
-            (*overload)->space->Parse(*(*overload)->source_code);
+            if ((*overload)->linkage.storage_class != linkage_t::sc_abstract)
+            {
+                if ((*overload)->source_code != nullptr)
+                {
+                    if ((*overload)->space != nullptr)
+                        (*overload)->space->Parse(*(*overload)->source_code);
+                    else
+                        throw "FSM error: methods space lost";
+                }
+            }
         }
     }
 #endif

@@ -79,6 +79,7 @@ int ExpressionParser::Parse(SourcePtr &source)
         shunting_yard_t * index_exp = new shunting_yard_t(*index_parser.PrepareExpression());
         operands.push_back(*index_exp);
         prev_was_operand = true;
+        PrepareExpression();
         break;
     }
 
@@ -419,7 +420,12 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 	case lt_point_to:
 	case lt_indirect_pointer_to_member:
 	case lt_direct_pointer_to_member:
-		node = new expression_node_t(yard->lexem);
+        if (rvalue == nullptr)
+        {
+            space_state->CreateError(yard->line_number, -77716122, "field or method '%s' not found", yard->right->text.c_str());
+            return nullptr;
+        }
+        node = new expression_node_t(yard->lexem);
 		node->left = lvalue;
 		node->right = rvalue;
 		node->type = rvalue->type;
@@ -651,7 +657,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		}
 
 		call_t * call = new call_t(this->space_state, function->name, nullptr);
-		PrepareArguments(call, lvalue);
+		PrepareArguments(call, rvalue);
 		function_overload_t * overload = function->FindOverload(call);
 		yard->type = function->type;
 
@@ -1086,8 +1092,17 @@ void ExpressionParser::ParseOpenBracket(SourcePtr &node)
 		{
 			throw "expression state machine error";
 		}
+        shunting_yard_t * parent = nullptr;
+        if (operators.size() > 0)
+        {
+            parent = &operators.back();
+            int prev_prio = GetLexemPriority(parent->lexem);
+            int my_prio = 20;
+            if (prev_prio <= my_prio)
+                this->PrepareExpression();
+        }
+		parent = &operands.back();
 
-		shunting_yard_t * parent = &operands.back();
 		switch (parent->lexem)
 		{
 		case lt_dot:

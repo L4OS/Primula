@@ -507,9 +507,31 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                 }
                 switch (args.lexem)
                 {
+                case lt_integer:
                 case lt_string:
                 case lt_class:
                 case lt_enum:
+                    variable = CreateVariable(type, name, linkage);
+                    if (variable->type->prop == type_t::compound_type)
+                    {
+                        structure_t *  st = (structure_t*)variable->type;
+                        function_parser * constructor = st->space->FindFunctionInSpace(st->name);
+                        if (constructor == nullptr)
+                        {
+                            CreateError(source.line_number, -7711114, "Constructor for %s not defined", name);
+                            source.Finish();
+                            return;
+                        }
+                        SourcePtr args(source.sequence);
+                        variable->declaration = constructor->TryCallFunction(this, args);
+                        source++;
+                        return;
+                    }
+                    else
+                    {
+                        CreateError(source.line_number, -7711114, "TODO: assign built-in types");
+                        break;
+                    }
                     break;
                 default:
                     CreateError(source.line_number, -7777774, "non-terminated function definition" );
@@ -551,6 +573,10 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 				return;
 			}
 			function->Parse(source.line_number, this, source.statements);
+            if (this->type == space_t::structure_space)
+                function->linkage.storage_class = linkage_t::sc_inline;
+            //else
+            //    printf("/* Check here! */\n");
 			source++;
 			return;
 		}
