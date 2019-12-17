@@ -927,8 +927,9 @@ int namespace_t::ParseStatement(SourcePtr &source)
 
 		case select_state:
 			SelectStatement(type, &linkage, name, source);
-			if (source != false)
-				switch (source.lexem)
+            if (source == false)
+                continue;
+			switch (source.lexem)
 			{
 			case lt_semicolon:
 				state = startup_state;
@@ -984,8 +985,6 @@ int namespace_t::ParseStatement(SourcePtr &source)
 			default:
 				throw "Fix me just NOW!!!!!";
 			}
-			else
-				fprintf(stderr, "TODO: Check this on select_state\n");
 			break; // end of select state
 
 		case parsing_state:

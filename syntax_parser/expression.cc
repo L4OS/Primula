@@ -993,34 +993,35 @@ void ExpressionParser::ParseOperator_SIZEOF(SourcePtr &source)
 			this->space_state->CreateError(source.line_number, -77771236, "sizeof format error" );
 			continue;
 		}
-        ExpressionParser	arg_parser(space_state);
+        ExpressionParser	sizeof_parser(space_state);
 #if MODERN_COMPILER
         arg_parser.ParseExpression(SourcePtr(source.sequence));
 #else
         SourcePtr ptr(source.sequence);
-        arg_parser.ParseExpression(ptr);
+        sizeof_parser.ParseExpression(ptr);
 #endif
-
         expression_t	* sizeof_exp = nullptr;
-        if (arg_parser.operands.size() == 1 && arg_parser.operators.size() == 0)
+        type = nullptr;
+        if (sizeof_parser.operands.size() == 1 && sizeof_parser.operators.size() == 0)
         {
             // Check type
-            shunting_yard_t yard = arg_parser.operands.back();
+            shunting_yard_t yard = sizeof_parser.operands.back();
             if (yard.lexem == lt_word)
-            {
                 type = space_state->FindType(yard.text);
-                if (type)
-                    goto type_found;
-            }
+            else
+                type = space_state->GetBuiltinType(yard.lexem);
         }
-        sizeof_exp = arg_parser.BuildExpression();
-        if (sizeof_exp == nullptr)
+        if (!type)
         {
-            this->space_state->CreateError(source.line_number, -77771237, "cannot parse sizeof argument");
-            source.Finish();
-            continue;
+            sizeof_exp = sizeof_parser.BuildExpression();
+            if (sizeof_exp == nullptr)
+            {
+                this->space_state->CreateError(source.line_number, -77771237, "cannot parse sizeof argument");
+                source.Finish();
+                continue;
+            }
+            type = sizeof_exp->type;
         }
-        type = sizeof_exp->type;
 type_found:
         shunting_yard_t		yard(source);
         int sz = type->bitsize >> 3;
