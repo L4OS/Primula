@@ -5,6 +5,8 @@ bool     restore_source_t::opt_HideUnusedPrototypes;
 static char INDENT[80];
 static int	right = 0;
 
+#pragma region Code Writer
+
 static void MoveIndentRight()
 {
     INDENT[right] = ' ';
@@ -53,6 +55,8 @@ static void PrintCloseBlock(bool lineFeed)
     MoveIndentLeft();
 	IndentWrite("}%s", lineFeed ? "\n" : " ");
 }
+
+#pragma endregion Code Writer
 
 restore_source_t::restore_source_t()
 {
@@ -642,8 +646,13 @@ void restore_source_t::GenerateFunction(function_parser * f, bool proto)
         overload != f->overload_list.end();
         ++overload)
     {
-        if (!opt_HideUnusedPrototypes || (*overload)->function->access_count > 0)
-            GenerateFunctionOverload(*overload, proto);
+        if (type == space_t::structure_space ||
+            !opt_HideUnusedPrototypes ||
+            (*overload)->function->access_count > 0)
+        {
+            if( (*overload)->linkage.storage_class != linkage_t::sc_inline)
+                GenerateFunctionOverload(*overload, proto);
+        }
         //else
         //{
         //    printf("// ");
@@ -769,7 +778,7 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
                     ++overload)
                 {
                     if ((*overload)->space != nullptr && (*overload)->linkage.storage_class != linkage_t::sc_inline)
-                        GenerateFunction(*f, false);
+                        GenerateFunctionOverload(*overload, false);
                 }
             }
 #endif
