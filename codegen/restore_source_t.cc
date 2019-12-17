@@ -695,13 +695,13 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
         for (
             func = func_ptr->overload_list.begin();
             func != func_ptr->overload_list.end();
-            )
+            ++func )
         {
             //			function_parser * func = (function_parser*)func_ptr;
             arg_list_t::iterator arg;
             for (
                 arg = (*func)->arguments.begin();
-                arg != (*func)->arguments.begin();
+                arg != (*func)->arguments.end();
                 ++arg)
             {
                 GenerateTypeName(arg->type, arg->name.c_str());
@@ -716,6 +716,7 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
     case type_t::compound_type:
 	{
 		structure_t * compound_type = (structure_t*)type;
+        Write(INDENT);
 		GenerateTypeName(type, nullptr);
 		if (compound_type->space->inherited_from.size() > 0)
 		{
@@ -740,8 +741,11 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
         }
 		PrintOpenBlock();
 		((restore_source_t*)compound_type->space)->GenerateSpace();
-		if (inlined_only)
-            Write("} ");
+        if (inlined_only)
+        {
+            MoveIndentLeft();
+            IndentWrite("} ");
+        }
 		else
 		{
 			PrintCloseBlock(false);
@@ -807,8 +811,11 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
             ++idx;
         }
 #endif
-		if (inlined_only)
-			Write("} ");
+        if (inlined_only)
+        {
+            MoveIndentLeft();
+            IndentWrite("} ");
+        }
 		else
 			PrintCloseBlock(false);
         break;
@@ -899,9 +906,12 @@ void restore_source_t::GenerateStatement(statement_t * code)
     {
         operator_DO * op = (operator_DO*)code;
         IndentWrite("do\n");
-        MoveIndentRight();
+        bool block = (op->body->type == statement_t::_codeblock);
+        if(!block)
+            MoveIndentRight();
         GenerateStatement(op->body);
-        MoveIndentLeft();
+        if (!block)
+            MoveIndentLeft();
         IndentWrite("while(");
         GenerateExpression(op->expression);
         Write(");\n");
@@ -1186,52 +1196,18 @@ void restore_source_t::GenerateSpaceFunctions()
 
 void restore_source_t::GenerateSpace()
 {
-#if MODERN_COMPILER
-    for (auto f : space->function_list)
-		//		if (f->space == nullptr)
-		GenerateFunction(f, true);
-    if (space->space_types_list.size() > 0)
-    {
-        //		printf("/* Space type definitions '%s' */\n", space->name.c_str());
-        for (auto type : space->space_types_list)
-            GenerateType(type, false);
-    }
-
-    /* Do variables declaration as statements */
-    if (space->space_code.size() > 0)
-    {
-        //		printf("/* Code definitions */\n");
-        for (auto code : space->space_code)
-            GenerateStatement(code);
-    }
-
-    if (space->function_list.size() > 0)
-    {
-        //		printf("/* Method definitions */\n");
-        for (auto f : space->function_list)
-            for (auto overload : f->overload_list)
-            {
-                if (overload->linkage.storage_class == linkage_t::sc_inline || space->type != space_t::spacetype_t::structure_space)
-                {
-                    if (overload->space != nullptr)
-                    {
-                        bool proto = false;
-                        if (overload->space->parent->type == space_t::spacetype_t::structure_space)
-                            proto = overload->linkage.storage_class != linkage_t::sc_inline;
-                        GenerateFunctionOverload(overload, proto);
-                    }
-                }
-            }
-    }
-#else
     this->GenerateSpaceTypes();
     this->GenerateFunctionPrototypes();
     this->GenerateSpaceCode();
     this->GenerateSpaceFunctions();
-#endif
 }
 
+///
+/// Main entry point to source restorer
+///    It is important to have type of the space argument to be restore_source_t type.
+///
 void restore_source_t::GenerateCode(namespace_t * space)
 {
-    ((restore_source_t*)space)->GenerateSpace();
+    typedef restore_source_t    *   this_t;
+    this_t(space)->GenerateSpace();
 }
