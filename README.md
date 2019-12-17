@@ -2,8 +2,6 @@
 
 ![Primula](http://primula.l4os.ru/wp-content/uploads/2014/01/primula_200.png)
 
-## Parsers
-
 This is a set of C language parsers. A some subset of C++ is also supported.
 
 ## Contents
