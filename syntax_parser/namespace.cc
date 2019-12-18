@@ -511,6 +511,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                 case lt_string:
                 case lt_class:
                 case lt_enum:
+                case lt_word:
                     variable = CreateVariable(type, name, linkage);
                     if (variable->type->prop == type_t::compound_type)
                     {
@@ -529,8 +530,16 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                     }
                     else
                     {
-                        CreateError(source.line_number, -7711114, "TODO: assign built-in types");
-                        break;
+                        expression_t  *  code = ParseExpression(source);
+                        if (CompareTypes(variable->type, code->type, true, 0) == no_cast)
+                        {
+                            CreateError(source.line_number, -7711114, "Unable translate type");
+                            source.Finish();
+                            return;
+                        }
+                        // TODO: enable only if constant or namespace within function 
+                        variable->declaration = code;
+                        return;
                     }
                     break;
                 default:
