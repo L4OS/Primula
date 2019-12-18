@@ -3,7 +3,7 @@ all:
 		make -C syntax_parser 
 
 check:
-		echo "Tests under construction"
+		make -C check
 
 distcheck:
 		echo "TODO: eliminate distcheck test"
