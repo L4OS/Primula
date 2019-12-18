@@ -115,7 +115,7 @@ extern int GetLexemPriority(lexem_type_t  lex)
 			prio = 2000;
 			break;
 		default:
-			__debugbreak();
+//			__debugbreak();
 			throw "Lexem priority not defined";
 		}
 	return prio;
