@@ -1,6 +1,6 @@
-all:
-		cd lexical_parser && $(MAKE)
-		cd../syntaxparser && &(MAKE)
+all: 
+		make -C lexic_parser 
+		make -C syntax_parser 
 
 check:
 		echo "Tests under construction"
