@@ -621,7 +621,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		if (type->prop != type_t::compound_type)
 		{
 			this->space_state->CreateError(yard->line_number, -77716721, "method cannot call for non compound type '%s'", type->name.c_str());
-			break;
+			break;  
 		}
 		structure_t * structure = (structure_t *)type;
 		function_parser * function = structure->space->FindFunctionInSpace(yard->text);
@@ -1305,7 +1305,10 @@ expression_node_t * FixConstants(expression_node_t * node)
 		case lt_div:
 			val = node->left->constant->integer_value / node->right->constant->integer_value;
 			break;
-		case lt_shift_left:
+        case lt_rest:
+            val = node->left->constant->integer_value % node->right->constant->integer_value;
+            break;
+        case lt_shift_left:
 			val = node->left->constant->integer_value <<= node->right->constant->integer_value;
 			break;
 		case lt_shift_right:
