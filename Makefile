@@ -1,4 +1,4 @@
 all:
-		make -C lexical_parser
+		make -C lexic_parser
 		make -C syntax_parser
 		
