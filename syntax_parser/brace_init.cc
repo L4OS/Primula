@@ -29,11 +29,16 @@ static static_data_t * String(type_t * type, Code::lexem_node_t * node)
             continue;
         case type_t::dimension_type:
             array = (array_t*)type;
-            if (array->child_type->bitsize != 8)
-                throw "utf16/utf32 strings not supported in this version";
             if (array->items_count < std::string(node->value).length() + 1)
                 throw "Array size too small to keep constant string";
             type = array->child_type;
+            continue;
+        case type_t::signed_type:
+            if (type->bitsize != 8)
+                throw "utf16/utf32 strings not supported in this version";
+            break;
+        default:
+            throw "rvalue type not matched to C-string";
         }
         break;
     }
@@ -313,12 +318,12 @@ static_data_t * namespace_t::BraceEncodedStructureInitialization(structure_t * s
     }
 #else
     Code::statement_list_t::iterator   statement;
+    std::list<variable_base_t*>::iterator var = structure->space->space_variables_list.begin();
     for (
         statement = encoded_data->begin();
         statement != encoded_data->end();
         ++statement)
     {
-        std::list<variable_base_t*>::iterator var = structure->space->space_variables_list.begin();
         Code::lexem_list_t::iterator    sequence;
         for (
             sequence = statement->begin();
