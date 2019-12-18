@@ -714,7 +714,7 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
                 ++arg)
             {
                 GenerateTypeName(arg->type, arg->name.c_str());
-                if (&arg != &(*func)->arguments.begin())
+                if (arg != (*func)->arguments.begin())
                     Write(", ");
             }
         }
