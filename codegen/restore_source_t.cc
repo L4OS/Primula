@@ -447,7 +447,7 @@ bool GenerateTypeName(type_t * type, const char * name)
 
         default:
             if (name)
-                Write("%s %s ", type->name.c_str(), name);
+                Write("%s %s", type->name.c_str(), name);
             else
                 Write("%s ", type->name.c_str());
         }
@@ -1192,18 +1192,22 @@ void restore_source_t::GenerateSpaceFunctions(bool definition)
                 overload != (*f)->overload_list.end();
                 ++overload)
             {
-                if ((*overload)->space != nullptr)
+                namespace_t * space = (*overload)->space;
+                if (space != nullptr)
                 {
+                    linkage_t * linkage = &(*overload)->linkage;
                     if (definition)
                     {
-                        GenerateFunctionOverload(*overload, !(*overload)->linkage.inlined);
+                        GenerateFunctionOverload(*overload, !linkage->inlined && space->type == spacetype_t::structure_space);
                     }
                     else
                     {
-                        GenerateFunctionOverload(*overload, (*overload)->linkage.inlined);
+                        GenerateFunctionOverload(*overload, linkage->inlined);
                     }
-                    Write("\n");
+//                    Write("\n");
                 }
+                else
+                    GenerateFunctionOverload(*overload, true);
             }
         }
     }
