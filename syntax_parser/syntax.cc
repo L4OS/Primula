@@ -42,16 +42,16 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 		count = sscanf(buffer, "%d\n", &lexem_type);
 
 		ev.lexem_type = lexem_type;
-#if true
-		if (lexem_value_ptr != 0)
+
+        if (lexem_value_ptr != 0)
 		{
 			int sz = strlen(lexem_value_ptr) + 1;
-			ev.lexem_value = new char[sz];
+            // memory leak
+            ev.lexem_value = new char[sz];
 			strcpy((char*)ev.lexem_value, lexem_value_ptr);
 		}
 		else
-#endif
-		ev.lexem_value = lexem_value_ptr;
+            ev.lexem_value = lexem_value_ptr;
 		ev.line_number = line_number;
 		ev.file_name = filename;
 

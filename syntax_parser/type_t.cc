@@ -92,6 +92,8 @@ compare_t  CompareTypes(
         }
         return no_cast;
 	}
+    if (ltype->prop == type_t::void_type)
+        return no_cast;
 	throw "TODO Finish type comparasion";
 }
 

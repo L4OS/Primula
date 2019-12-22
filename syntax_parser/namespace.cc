@@ -345,7 +345,7 @@ void namespace_t::CheckStorageClass(SourcePtr & source, linkage_t * linkage)
 				linkage->storage_class = linkage_t::sc_virtual;
 				break;
 			case lt_inline:
-				linkage->storage_class = linkage_t::sc_inline;
+				linkage->inlined = true;
 				break;
 			default:
 				return;
@@ -582,8 +582,8 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
 				return;
 			}
 			function->Parse(source.line_number, this, source.statements);
-            if (this->type == space_t::structure_space)
-                function->linkage.storage_class = linkage_t::sc_inline;
+            if (this->no_parse_methods_body)
+                function->linkage.inlined = true;
             //else
             //    printf("/* Check here! */\n");
 			source++;

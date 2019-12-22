@@ -142,6 +142,7 @@ private:
 		this->type = type;
 		this->name = name;
 		owner_function = parent->owner_function;
+        no_parse_methods_body = false;
 	}
 
 public:
