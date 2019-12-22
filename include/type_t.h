@@ -58,12 +58,16 @@ struct linkage_t
 		sc_register,
 		sc_mutable,
 		sc_virtual,
-		sc_inline,
 		sc_abstract,
 		sc_argument // Not sure, maybe default better for this
 	} storage_class = sc_default;
-
+    bool inlined;
 	std::string	 linkage_def;
+
+    linkage_t()
+    {
+        inlined = false;
+    }
 };
 
 class pointer_t : public type_t
