@@ -847,7 +847,7 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
         IndentWrite("typedef ");
         if (def->type->prop != type_t::enumerated_type)
         {
-            GenerateType(def->type, false);
+            GenerateType(def->type, true);
             IndentWrite("%s;\n", type->name.c_str());
         }
         else
@@ -1174,7 +1174,10 @@ void restore_source_t::GenerateSpaceCode()
             code != space_code.end();
             ++code)
         {
-            GenerateStatement(*code);
+            if (*code != nullptr)
+                GenerateStatement(*code);
+            else
+                printf("// code empty\n");
         }
     }
 }
@@ -1198,7 +1201,7 @@ void restore_source_t::GenerateSpaceFunctions(bool definition)
                     linkage_t * linkage = &(*overload)->linkage;
                     if (definition)
                     {
-                        GenerateFunctionOverload(*overload, !linkage->inlined && space->type == spacetype_t::structure_space);
+                        GenerateFunctionOverload(*overload, !linkage->inlined && this->type == spacetype_t::structure_space);
                     }
                     else
                     {
@@ -1225,7 +1228,7 @@ void restore_source_t::GenerateSpace()
     else
     {
         this->GenerateSpaceCode();
-        Write("\n");
+//        Write("\n");
     }
     this->GenerateSpaceFunctions(true);
 }
