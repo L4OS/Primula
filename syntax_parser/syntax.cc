@@ -39,7 +39,7 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 			char * s = strchr(lexem_value_ptr, '\n');
 			if (s) *s = 0;
 		}
-		count = sscanf(buffer, "%d\n", &lexem_type);
+		count = sscanf(buffer, "%d\n", (int*) &lexem_type);
 
 		ev.lexem_type = lexem_type;
 
