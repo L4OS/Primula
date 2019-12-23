@@ -68,7 +68,8 @@ public:
 	variable_base_t     *   TryEnumeration(std::string name, bool self_space);
     expression_node_t   *   TryEnumeration(std::string name);
     variable_base_t     *   FindVariable(std::string name);
-	function_parser     *   FindFunctionInSpace(std::string name);
+    variable_base_t     *   FindVariableInspace(std::string name);
+    function_parser     *   FindFunctionInSpace(std::string name);
 	function_parser     *   FindFunction(std::string name);
 	function_parser     *   FindTemplateFunction(std::string name);
 	type_t              *   FindType(std::string name);

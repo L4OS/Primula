@@ -36,6 +36,14 @@ private:
 	void					FixExpression(shunting_yard_t shunt, int prio);
 	void					PrepareArguments(call_t * call, expression_node_t * arg);
 
+    expression_node_t   *   CheckWord(
+        namespace_t             *   space,
+        std::string                 name,
+        bool                        no_parent_check,
+        expression_node_t       *   rvalue,
+        int                         line_num);
+    expression_node_t	*	CreateWordMode(std::string word, shunting_yard_t * parent, expression_node_t * left, expression_node_t	*	rvalue, int line_num);
+
 public:
 	lexem_type_t		ParseExpression(SourcePtr &source);
 	shunting_yard_t *	PrepareExpression(void);
@@ -74,12 +82,12 @@ int ExpressionParser::Parse(SourcePtr &source)
 #else
         SourcePtr ptr(source.sequence);
         index_parser.ParseExpression(ptr);
+        index_parser.PrepareExpression();
 #endif
         FixExpression(shunt, prio);
         shunting_yard_t * index_exp = new shunting_yard_t(*index_parser.PrepareExpression());
         operands.push_back(*index_exp);
         prev_was_operand = true;
-        PrepareExpression();
         break;
     }
 
@@ -118,55 +126,7 @@ int ExpressionParser::Parse(SourcePtr &source)
         break;
 
     case lt_closebraket:
-    {
-#if true
-    throw "FSM error: lt_closebracker was reduced on lexem splitting stage";
-#else
-#pragma message ("This code never calling due to new format of parenthesis. Must rewrite it to detect typecasting")
-    shunting_yard_t	op = operators.back();
-    if (prev_was_operand == false)
-    {
-        if (op.lexem != lt_mul)
-        {
-            this->space_state->CreateError(source.line_number, -777777721, "Expression error");
-            throw "Check me";
-        }
-        operators.pop_back();
-
-        op.left = new shunting_yard_t(operands.back());
-        operands.pop_back();
-        op.lexem = lt_pointer;
-        op.unary = true;
-        if (operators.back().lexem != lt_openbraket)
-        {
-            this->space_state->CreateError(source.line_number, -777777721, "Expression error");
-            throw "Check me";
-        }
-        operators.pop_back();
-        shunt.lexem = lt_typecasting;
-        shunt.left = new shunting_yard_t(op);
-        shunt.unary = true;
-        operators.push_back(shunt);
-    }
-    else
-    {
-        while (op.lexem != lt_openbraket)
-        {
-            operators.pop_back();
-            op.right = new shunting_yard_t(operands.back());
-            operands.pop_back();
-            if (!op.unary)
-            {
-                op.left = new shunting_yard_t(operands.back());
-                operands.pop_back();
-            }
-            operands.push_back(op);
-            op = operators.back();
-    }
-        operators.pop_back();
-}
-#endif
-    }
+        throw "FSM error: lt_closebracker was reduced on lexem splitting stage";
 
     default:
         if (prio >= 1000)
@@ -197,15 +157,14 @@ void ExpressionParser::FixExpression(shunting_yard_t shunt, int prio)
 		shunting_yard_t	op = operators.back();
 		if (op.lexem == lt_namescope)
 		{
-            if (operands.size() == 0)
+            if (operands.size() != 0)
             {
-                space_state->CreateError(shunt.line_number, -7774003, "unable parse namespace access");
-                return;
+                shunting_yard_t  name = operands.back();
+                operands.pop_back();
+                op.right = new shunting_yard_t(name);
             }
-            shunting_yard_t  name = operands.back();
-            op.right = new shunting_yard_t(name);
+            op.left = new shunting_yard_t(shunt);
             operators.pop_back();
-            operands.pop_back();
 			operands.push_back(op);
 			//shunt = op;
 		}
@@ -255,10 +214,15 @@ variable_base_t		*	ExpressionParser::FindVariable(shunting_yard_t * pYard)
 	variable_base_t		*	var = nullptr;
 	switch (pYard->lexem)
 	{
+    case lt_this:
+        printf("debug\n");
+        break;
 	case lt_word:
 		var = this->space_state->FindVariable(pYard->text);
 		break;
-
+    case lt_openindex:
+        var = this->space_state->FindVariable(pYard->left->text);
+        break;
 	default:
 		throw "Parser stuck at ExpressionParser::FindVariable(shunting_yard_t * pYard)";
 		break;
@@ -359,9 +323,201 @@ void ExpressionParser::PrepareArguments(call_t * call, expression_node_t * arg)
 	}
 }
 
+expression_node_t * ExpressionParser::CheckWord(
+    namespace_t         *   space,
+    std::string             name,
+    bool                    no_parent_check,
+    expression_node_t   *   rvalue,
+    int                     line_num)
+{
+    expression_node_t * node = nullptr;
+    do
+    {
+        function_parser * fptr = no_parent_check ? space->FindFunctionInSpace(name) : space->FindFunction(name);
+        if (fptr != nullptr)
+        {
+            call_t * call = new call_t(space, name, nullptr);
+            PrepareArguments(call, rvalue);
+            function_overload_t * overload = fptr->FindOverload(call);
+
+            node = new expression_node_t(lt_call_method);
+            node->call = call;
+            node->type = fptr->type;
+            break;
+        }
+
+        variable_base_t * var = no_parent_check ? space->FindVariableInspace(name) : space->FindVariable(name);
+        if (var != nullptr)
+        {
+            node = new expression_node_t(lt_variable);
+            node->variable = var;
+            node->type = var->type;
+            break;
+        }
+        var = space->TryEnumeration(name, no_parent_check);
+        if (var != nullptr)
+        {
+            node = new expression_node_t(lt_integer);
+            node->type = space->GetBuiltinType(lt_type_int);
+            node->is_constant = true;
+            node->constant = new constant_node_t(333);
+            break;
+        }
+        space->CreateError(line_num, -77716721, "unparsed statement '%s' ", name);
+    }
+    while (false);
+
+    return node;
+}
+
+expression_node_t	*	ExpressionParser::CreateWordMode(std::string word, shunting_yard_t * parent, expression_node_t * left, expression_node_t	*	rvalue, int line_num)
+{
+    expression_node_t	*	node = nullptr;
+    variable_base_t     *   var = nullptr;
+
+    do 
+    {
+        // Check varible is a field of structured type
+        if ((parent != nullptr))
+        {
+            if ((parent->lexem == lt_dot || parent->lexem == lt_point_to))
+            {
+                if (left == nullptr)
+                {
+                    if (parent->left == nullptr)
+                        throw "Expression StateMachineError";
+                    var = FindVariable(parent->left);
+                    if (var == nullptr)
+                    {
+                        this->space_state->CreateError(line_num, -77716721, "variable '%s' not found", parent->left->text.c_str());
+                        break;
+                    }
+                    type_t * vartyp = var->type;
+                    if ((parent->lexem == lt_point_to) & (vartyp->prop == type_t::pointer_type))
+                    {
+                        vartyp = ((pointer_t*)vartyp)->parent_type;
+                    }
+                    while (vartyp->prop == type_t::typedef_type)
+                    {
+                        vartyp = ((typedef_t*)vartyp)->type;
+                    }
+                    if (vartyp->prop != type_t::compound_type)
+                    {
+                        this->space_state->CreateError(line_num, -77716721, "variable '%s' is not compound", var->name.c_str());
+                        break;
+                    }
+                    node = new expression_node_t(lt_variable);
+                    node->variable = var;
+                    node->type = var->type;
+                    break;
+                }
+                if (left->lexem == lt_this)
+                {
+                    namespace_t * self = this->space_state;
+                    while (self && self->type != namespace_t::spacetype_t::structure_space)
+                    {
+                        self = self->parent;
+                    }
+                    if (self == nullptr)
+                    {
+                        this->space_state->CreateError(line_num, -77716623, "operator 'this' is allowed within  methods only", var->name.c_str());
+                        break;
+                    }
+
+                    node = CheckWord(self, word, true, rvalue, line_num);
+                    break;
+                }
+
+                if (left->lexem == lt_openindex)
+                {
+                    if (left->type->prop != type_t::compound_type)
+                    {
+                        space_state->CreateError(line_num, -77716721, "unparsed statement '%s' ", word.c_str());
+                        break;
+                    }
+                    typedef structure_t * pstructure_t;
+                    namespace_t * space = pstructure_t(left->type)->space;
+                    node = CheckWord(space, word, true, rvalue, line_num);
+                    break;
+                }
+
+                if (left->lexem == lt_variable)
+                {
+                    type_t * type = left->variable->type;
+                    while (type->prop == type_t::typedef_type)
+                        type = ((typedef_t*)type)->type;
+                    if (parent->lexem == lt_point_to)
+                    {
+                        if (type->prop != type_t::pointer_type)
+                        {
+                            space_state->CreateError(line_num, -77716721, "non-pointer type '%s' ", left->variable->name.c_str());
+                            break;
+                        }
+                        type = ((pointer_t*)type)->parent_type;
+                    }
+                    while (type->prop == type_t::typedef_type)
+                        type = ((typedef_t*)type)->type;
+                    if (type->prop != type_t::compound_type)
+                    {
+                        space_state->CreateError(line_num, -77716721, "unparsed statement '%s' ", word.c_str());
+                        break;
+                    }
+                    typedef structure_t * pstructure_t;
+                    namespace_t * space = pstructure_t(type)->space;
+                    node = CheckWord(space, word, true, rvalue, line_num);
+                    break;
+                }
+                if (left->lexem == lt_point_to || left->lexem == lt_dot)
+                {
+                    type_t * type = left->type;
+                    if (type == nullptr)
+                        throw "FSM error 123";
+                    bool run = true;
+                    int pointer_count = 0;
+                    namespace_t * space = nullptr;
+                    do
+                    {
+                        switch (type->prop)
+                        {
+                        case type_t::pointer_type:
+                            type = ((pointer_t*)type)->parent_type;
+                            ++pointer_count;
+                            break;
+                        case type_t::compound_type:
+                            run = false;
+                            space = ((structure_t*)type)->space;
+                            continue;
+                        default:
+                            throw "type error";
+                        }
+                    } while (run);
+                    if (space == nullptr)
+                    {
+                        this->space_state->CreateError(line_num, -77716721, "variable '%s' not found", parent->left->text.c_str());
+                        break;
+                    }
+                    node = CheckWord(space, word, left, rvalue, line_num);
+                    break;
+                }
+                else
+                    throw "Parser FSM error: not parsed method call";
+            }
+        }
+
+        node = CheckWord(space_state, word, false, rvalue, line_num);
+        if (node == nullptr)
+        {
+            this->space_state->CreateError(line_num, -77716921, "Syntax error: Non-recognized statement '%s'", word.c_str());
+            break;
+        }
+    }
+    while (false);
+    return node;
+}
+
 expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shunting_yard_t * parent, expression_node_t * left)
 {
-    //if (yard->line_number == 163)
+    //if (yard->line_number == 664)
     //{
     //    fprintf(stderr, "debug\n");
     //}
@@ -432,134 +588,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		break;
 	case lt_word:
 	{
-        // Check varible is a field of structured type
-        if (parent != nullptr && (parent->lexem == lt_dot || parent->lexem == lt_point_to))
-        {
-            if (left == nullptr)
-            {
-                if (parent->left == nullptr)
-                    throw "Expression StateMachineError";
-                var = FindVariable(parent->left);
-                if (var == nullptr)
-                {
-                    this->space_state->CreateError(yard->line_number, -77716721, "variable '%s' not found", parent->left->text.c_str());
-                    break;
-                }
-                type_t * vartyp = var->type;
-                if ((parent->lexem == lt_point_to) & (vartyp->prop == type_t::pointer_type))
-                {
-                    vartyp = ((pointer_t*)vartyp)->parent_type;
-                }
-                while (vartyp->prop == type_t::typedef_type)
-                {
-                    vartyp = ((typedef_t*)vartyp)->type;
-                }
-                if (vartyp->prop != type_t::compound_type)
-                {
-                    this->space_state->CreateError(yard->line_number, -77716721, "variable '%s' is not compound", var->name.c_str());
-                    break;
-                }
-                left = new expression_node_t(lt_variable);
-                left->variable = var;
-                left->type = var->type;
-            }
-            else
-            {
-                type_t * type = left->type;
-                while (type->prop == type_t::constant_type)
-                    type = ((const_t*)type)->parent_type;
-                while (type->prop == type_t::typedef_type)
-                    type = ((typedef_t*)type)->type;
-
-                if (parent->lexem == lt_point_to && type->prop == type_t::pointer_type)
-                {
-                    type = ((pointer_t*)type)->parent_type;
-                    while (type->prop == type_t::constant_type)
-                        type = ((const_t*)type)->parent_type;
-                    while (type->prop == type_t::typedef_type)
-                        type = ((typedef_t*)type)->type;
-                }
-
-                if (type->prop == type_t::compound_type)
-                {
-                    structure_t * structure = (structure_t *)type;
-                    //if (left->variable)
-                    {
-#if MODERN_COMPILER
-                        auto pair = structure->space->space_variables_map.find(yard->text);
-#else
-                        std::map<std::string, variable_base_t*>::iterator pair;
-                        pair = structure->space->space_variables_map.find(yard->text);
-#endif
-                        if (pair != structure->space->space_variables_map.end())
-                        {
-                            variable_base_t * tmp = pair->second;
-                            node = new expression_node_t(lt_variable);
-                            node->left = lvalue;
-                            node->right = rvalue;
-                            node->type = tmp->type;
-                            node->variable = tmp;
-                            break;
-                        }
-#if MODERN_COMPILER
-                        for (auto inherited_from : structure->space->inherited_from)
-                        {
-                            var = inherited_from->space->FindVariable(yard->text);
-                            if (var != nullptr)
-                                break;
-                        }
-#else
-                        std::list<structure_t*>::iterator inherited_from;
-                        for (
-                            inherited_from = structure->space->inherited_from.begin();
-                            inherited_from != structure->space->inherited_from.end();
-                            ++inherited_from)
-                        {
-                            var = (*inherited_from)->space->FindVariable(yard->text);
-                            if (var != nullptr)
-                                break;
-                        }
-#endif
-                        if (var != nullptr)
-                        {
-                            node = new expression_node_t(lt_variable);
-                            node->left = lvalue;
-                            node->right = rvalue;
-                            node->type = var->type;
-                            node->variable = var;
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    this->space_state->CreateError(yard->line_number, -77716721, "field cannot be taken for non-compound type");
-                    break;
-                }
-            }
-        }
-        fptr = this->space_state->FindFunction(yard->text);
-        if (fptr != nullptr)
-        {
-            node = new expression_node_t(lt_function_address);
-            node->type = fptr;
-            fprintf(stderr, "assign pointer to function\n");
-            break;
-        }
-        var = FindVariable(yard);
-		if (var != nullptr)
-		{
-			node = new expression_node_t(lt_variable);
-			node->variable = var;
-			node->type = var->type;
-			yard->type = node->type;
-			break;
-		}
-        node = space_state->TryEnumeration(yard->text);
-        if (node != nullptr)
-            break;
-
-        this->space_state->CreateError(yard->line_number, -77716921, "Syntax error: Non-recognized statement '%s'", yard->text.c_str());
+        node = CreateWordMode(yard->text, parent, left, rvalue, yard->line_number);
 		break;
 	}
 
@@ -615,7 +644,19 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 	}
 	case lt_call_method:
 	{
-		type_t * type = left->type;
+        type_t * type;
+        if (left == nullptr)
+        {
+            if (parent->lexem == lt_point_to || parent->lexem == lt_dot)
+            {
+                left = CreateNode(parent->left, nullptr, nullptr);
+            }
+            else 
+                throw "State machine error on call nethod";
+        }
+        else
+            printf("Left is not nullptr. Is this ok?");
+        type = left->type;
 		while (type->prop == type_t::pointer_type)
 			type = ((pointer_t*)left->type)->parent_type;
 		if (type->prop != type_t::compound_type)
@@ -851,7 +892,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 			node->right = rvalue;
 			node->is_constant = rvalue->is_constant;
 		}
-		node->type = yard->type;
+		node->type = new pointer_t(yard->type);
 		break;
 
 	case lt_argument:
