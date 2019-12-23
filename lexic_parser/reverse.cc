@@ -59,7 +59,7 @@ void lexem_to_string(lexem_item_t * l, char * txt_buff, int buff_size)
 	case lt_add_and_set:	snprintf(txt_buff, buff_size, "+=");					break;
 	case lt_sub_and_set:	snprintf(txt_buff, buff_size, "-=");					break;
 	case lt_div_and_set:	snprintf(txt_buff, buff_size, "/=");					break;
-	case lt_rest_and_set:	snprintf(txt_buff, buff_size, "%=");					break;
+	case lt_rest_and_set:	snprintf(txt_buff, buff_size, "%%=");					break;
 	case lt_namescope:		snprintf(txt_buff, buff_size, "::");					break;
 	case lt_return:			snprintf(txt_buff, buff_size, "return ");				break;
 	case lt_do:				snprintf(txt_buff, buff_size, "do");					break;
@@ -155,7 +155,7 @@ int restore_code(FILE * inp, FILE * of)
 		}
 		else
 		{
-			status = sscanf(buffer, "%d", &id);
+			status = sscanf(buffer, "%d", (int*) &id);
 			char * value = strchr(buffer, ' ');
 			if(value)
 			{
