@@ -35,7 +35,7 @@ static void Write(const char * s, ...)
 
 static void IndentWrite(const char *s, ...)
 {
-    printf(INDENT);
+    printf( (const char*) INDENT);
 
     va_list args;
     va_start(args, s);
@@ -310,9 +310,25 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
     case lt_new:
     {
         Write(" new ");
-        GenerateTypeName(n->type, nullptr);
+        type_t * type = n->type;
+        switch (type->prop)
+        {
+        case type_t::pointer_type:
+            type = ((pointer_t*)type)->parent_type;
+            break;
+        default:
+            throw "type must be pointer or array";
+        }
+        GenerateTypeName(type, nullptr);
         if (n->right != nullptr)
         {
+            if (n->right->lexem == lt_argument)
+            {
+                Write("(");
+                GenerateItem(n->right);
+                Write(")");
+                return;
+            }
             Write("[");
             GenerateItem(n->right);
             Write("]");
@@ -334,6 +350,11 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         Write(n->lexem == lt_operator_postinc ? "++ " : "-- ");
         return;
     }
+
+    case lt_argument:
+        if(n->right != nullptr)
+            Write(", ");
+        break;
 
     default:
         throw "Cannot generate lexem";
@@ -1207,10 +1228,12 @@ void restore_source_t::GenerateSpaceFunctions(bool definition)
                     {
                         GenerateFunctionOverload(*overload, linkage->inlined);
                     }
-//                    Write("\n");
                 }
-                else
-                    GenerateFunctionOverload(*overload, true);
+                else 
+                {
+                    if (!definition)
+                        GenerateFunctionOverload(*overload, true);
+                }
             }
         }
     }
@@ -1228,7 +1251,6 @@ void restore_source_t::GenerateSpace()
     else
     {
         this->GenerateSpaceCode();
-//        Write("\n");
     }
     this->GenerateSpaceFunctions(true);
 }
