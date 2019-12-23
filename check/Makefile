@@ -1,10 +1,10 @@
-all:
-       echo "Selected all"
+all: helloworld.c
+       echo "Rargetd all: ${0}"
        
-check:
+check: helloworld.c
         echo "Tests under construction"
+        echo "Targer check: ${0}"
 #        ls -l
-        echo "Test of tests"
         
     
-    
+  
