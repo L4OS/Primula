@@ -43,6 +43,7 @@ private:
         expression_node_t       *   rvalue,
         int                         line_num);
     expression_node_t	*	CreateWordMode(std::string word, shunting_yard_t * parent, expression_node_t * left, expression_node_t	*	rvalue, int line_num);
+    void ParseArguments(SourcePtr * node, shunting_yard_t * parent);
 
 public:
 	lexem_type_t		ParseExpression(SourcePtr &source);
@@ -1000,27 +1001,48 @@ void ExpressionParser::ParseOperator_NEW(SourcePtr &source)
 		source++;
 
 		int priority = 20;
-		if (source.lexem == lt_openindex)
+		switch (source.lexem)
 		{
-			ExpressionParser	index_parser(space_state);
+        case lt_semicolon:
+            break;
+        case lt_openbraket:
+        {
+            ParseArguments(&source, yard);
+            break;
+        }
+        case lt_openindex:
+        {
+            ExpressionParser	index_parser(space_state);
 #if MODERN_COMPILER
             index_parser.ParseExpression(SourcePtr(source.sequence));
 #else
             SourcePtr ptr(source.sequence);
             index_parser.ParseExpression(ptr);
 #endif
-			//			printf("Complete index parsing in operator 'new'\n");
+            expression_t * expr = index_parser.BuildExpression();
+            if (expr->is_constant == false)
+            {
+                this->space_state->CreateError(source.line_number, -77791004, "Non-constant index expression not supported");
+                continue;
+            }
+            //			printf("Complete index parsing in operator 'new'\n");
+            yard->type = new array_t(yard->type, 5);
 
-			shunting_yard_t * rval = new shunting_yard_t(index_parser.operands.back());
-			this->operands.push_back(*rval);
+            shunting_yard_t * rval = new shunting_yard_t(index_parser.operands.back());
+            this->operands.push_back(*rval);
+            //			FixExpression(*yard, priority);
+            source++;
+            break;
+        }
+        default:
+            this->space_state->CreateError(source.line_number, -77771234, "Expression broken in operator new");
+            source.Finish();
+            continue;
+        }
 
-			//			FixExpression(*yard, priority);
-			source++;
-		}
-		//		else
-		FixExpression(*yard, priority);
-
+        FixExpression(*yard, priority);
 		return;
+
 	} while (false);
 
 	this->space_state->CreateError(source.line_number, -77771234, "Expression broken in operator new");
@@ -1125,6 +1147,42 @@ lexem_type_t ExpressionParser::ParseIncrementDecrement(SourcePtr & node)
 	return lt_empty;
 }
 
+void ExpressionParser::ParseArguments(SourcePtr * node, shunting_yard_t * parent)
+{
+    if (node->sequence->size() > 0)
+    {
+        SourcePtr	seq(node->sequence);
+        while (seq == true)
+        {
+            ExpressionParser	arg_parser(space_state);
+            shunting_yard_t		arg(seq);
+            arg_parser.ParseExpression(seq);
+            arg.lexem = lt_argument;
+            arg.left = arg_parser.PrepareExpression();
+            arg.left = new shunting_yard_t(*arg.left);
+            parent->right = new shunting_yard_t(arg);
+
+            if (seq == false)
+                break;
+
+            if (seq.lexem != lt_comma)
+            {
+                this->space_state->CreateError(node->line_number, -77749810, "wrong input on waiting arguments delimiter");
+                seq.Finish();
+                return;
+            }
+            seq++;
+            if (seq != true)
+            {
+                this->space_state->CreateError(node->line_number, -77749810, "expext arguments after delimiter");
+                seq.Finish();
+                return;
+            }
+            parent = parent->right;
+        }
+    }
+}
+
 void ExpressionParser::ParseOpenBracket(SourcePtr &node)
 {
 	if (prev_was_operand)
@@ -1163,7 +1221,9 @@ void ExpressionParser::ParseOpenBracket(SourcePtr &node)
 
 		parent->lexem = node.lexem;
 //		fprintf(stderr, "Debug: Call method %s\n", node.value.c_str());
-
+#if true
+        ParseArguments(&node, parent);
+#else
         SourcePtr	seq(node.sequence);
         if (node.sequence->size() > 0)
 		{
@@ -1196,6 +1256,7 @@ void ExpressionParser::ParseOpenBracket(SourcePtr &node)
 				parent = parent->right;
 			}
 		}
+#endif
 		return;
 	}
 	else

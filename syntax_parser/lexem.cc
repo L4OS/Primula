@@ -109,6 +109,7 @@ extern int GetLexemPriority(lexem_type_t  lex)
 			break;
 		case lt_call:
 		case lt_call_method:
+        case lt_argument:
 			prio = 2000;
 			break;
 		case lt_function_address:
