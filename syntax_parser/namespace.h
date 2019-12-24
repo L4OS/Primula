@@ -19,7 +19,8 @@
 
 class namespace_t : public space_t
 {
-//protected:
+protected:
+    static bool     config_translate_ternary;
 public:
 
     Errors                                          errors;
@@ -133,6 +134,7 @@ private:
 	type_t * TypeDefOpenBraket(SourcePtr & source, std::string & name, type_t * type);
 	type_t * ParseIndex(SourcePtr & source, type_t * type);
 	//inline template_t * namespace_t::CreateTemplateType(std::string type_name);
+    void TranslateTernaryOperation(expression_t  *  code);
 
 //	friend class function_overload_parser;
 	friend struct function_overload_t;

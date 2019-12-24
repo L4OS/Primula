@@ -216,7 +216,7 @@ variable_base_t		*	ExpressionParser::FindVariable(shunting_yard_t * pYard)
 	switch (pYard->lexem)
 	{
     case lt_this:
-        printf("debug\n");
+        fprintf(stderr, "debug\n");
         break;
 	case lt_word:
 		var = this->space_state->FindVariable(pYard->text);
@@ -1364,6 +1364,20 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
         case lt_openbraket:
         {
             ParseOpenBracket(node);
+            continue;
+        }
+        case lt_quest:
+        {
+            shunting_yard_t yard(node);
+            prev_was_operand = false;
+            FixExpression(yard, 140); // Need 150 and rearrange priorities5
+            continue;
+        }
+        case lt_colon:
+        {
+            shunting_yard_t yard(node);
+            operators.push_back(yard);
+            prev_was_operand = false;
             continue;
         }
 

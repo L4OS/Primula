@@ -4,6 +4,8 @@
 #  include <stdlib.h>
 #endif
 
+bool namespace_t::config_translate_ternary = true;
+
 type_t  namespace_t::builtin_types[18] =
 {
     /*  0 */		type_t("auto", type_t::auto_type, 0),
@@ -1227,6 +1229,11 @@ int namespace_t::ParseStatement(SourcePtr &source)
                     {
                         source.Finish();
                         continue;
+                    }
+
+                    if (config_translate_ternary)
+                    {
+                        TranslateTernaryOperation(code);
                     }
                     //
                     // add expressiob to list

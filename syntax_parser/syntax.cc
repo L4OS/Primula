@@ -78,7 +78,7 @@ Code::statement_list_t  parse_file_stream(FILE * f)
 #include "../codegen/restore_source_t.h"
 #include "../codegen/Pascal/pascal_generator.h"
 
-#if true
+#if false
 restore_source_t			global_space;
 #else
 PascalGenerator             global_space;
