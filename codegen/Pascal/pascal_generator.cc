@@ -341,7 +341,24 @@ void PascalGenerator::GenerateExpression(expression_t * exp)
 {
 	if (exp->root != nullptr)
 	{
-		GenerateItem(exp->root);
+#if false
+        expression_node_t * ternary = FindTernaryOp(exp->root);
+        if (ternary != nullptr)
+        {
+            fprintf(stderr, "\n {TODO: Fix ternary ops }\n");
+            Write("if ");
+            expression_node_t * cond = ternary->left;
+            GenerateItem(cond);
+            Write(" then\n");
+            Write("tvar0: = ");
+            GenerateItem(ternary->right->left);
+            Write("\nelse\n");
+            Write("tvar0: = ");
+            GenerateItem(ternary->right->right);
+            Write("\n");
+        }
+#endif
+        GenerateItem(exp->root);
 	}
 }
 
@@ -634,7 +651,7 @@ void PascalGenerator::GenerateSpaceFunctions()
             overload != (*f)->overload_list.end();
             ++overload)
         {
-            if ((*overload)->space != nullptr && (*overload)->linkage.storage_class != linkage_t::sc_inline)
+            if ((*overload)->space != nullptr && !(*overload)->linkage.inlined)
                 GenerateFunction(*f, false);
         }
     }

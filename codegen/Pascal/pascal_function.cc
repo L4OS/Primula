@@ -32,10 +32,10 @@ void PascalGenerator::GenerateFunctionOverload(function_overload_t * overload, b
     case linkage_t::sc_virtual:
         printf("virtual ");
         break;
-    case linkage_t::sc_inline:
-        printf("inline ");
-        break;
     }
+
+    if(overload->linkage.inlined)
+        printf("inline ");
 
     if (!proto)
     {
@@ -43,7 +43,7 @@ void PascalGenerator::GenerateFunctionOverload(function_overload_t * overload, b
         if (overload->space != nullptr) // <-------------- This is hack. Must be eliminated
             if (overload->space->parent != nullptr &&
                 (overload->space->parent->type == space_t::structure_space) &&
-                (overload->linkage.storage_class != linkage_t::sc_inline))
+                (!overload->linkage.inlined))
             {
                 Write("%s", overload->space->parent->name.c_str());
             }
