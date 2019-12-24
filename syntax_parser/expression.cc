@@ -331,6 +331,10 @@ expression_node_t * ExpressionParser::CheckWord(
     expression_node_t   *   rvalue,
     int                     line_num)
 {
+    if (line_num == 849)
+    {
+        fprintf(stderr, "debug\n");
+    }
     expression_node_t * node = nullptr;
     do
     {
@@ -355,16 +359,21 @@ expression_node_t * ExpressionParser::CheckWord(
             node->type = var->type;
             break;
         }
-        var = space->TryEnumeration(name, no_parent_check);
-        if (var != nullptr)
+        if (no_parent_check)
         {
-            node = new expression_node_t(lt_integer);
-            node->type = space->GetBuiltinType(lt_type_int);
-            node->is_constant = true;
-            node->constant = new constant_node_t(333);
-            break;
+            var = space->TryEnumeration(name, no_parent_check);
+            if (var != nullptr)
+            {
+                node = new expression_node_t(lt_integer);
+                node->type = space->GetBuiltinType(lt_type_int);
+                node->is_constant = true;
+                node->constant = new constant_node_t(333);
+                break;
+            }
+            space->CreateError(line_num, -77716721, "unparsed statement '%s' ", name.c_str());
         }
-        space->CreateError(line_num, -77716721, "unparsed statement '%s' ", name);
+        else
+            node = space->TryEnumeration(name);
     }
     while (false);
 
@@ -1376,7 +1385,8 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
         case lt_colon:
         {
             shunting_yard_t yard(node);
-            operators.push_back(yard);
+//            operators.push_back(yard);
+            FixExpression(yard, 140); // Need 150 and rearrange priorities5
             prev_was_operand = false;
             continue;
         }
@@ -1430,6 +1440,8 @@ expression_node_t * FixConstants(expression_node_t * node)
 		case lt_shift_right:
 			val = node->left->constant->integer_value >>= node->right->constant->integer_value;
 			break;
+        case lt_colon:
+            return node;
 
 		default:
 			throw "Check operation";
