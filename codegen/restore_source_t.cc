@@ -136,6 +136,16 @@ void PrintCharacter(int ch)
     }
 }
 
+void GenerateSpaceName(namespace_t * space)
+{
+    if (space->type == space_t::name_space)
+    {
+        if (space->parent && space->parent->type == space_t::name_space)
+            GenerateSpaceName(space->parent);
+        Write("%s::", space->name.c_str());
+    }
+}
+
 void GenerateItem(expression_node_t * n, int parent_priority = 1000)
 {
     int my_prio = GetLexemPriority(n->lexem);
@@ -166,8 +176,19 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         str = "this";
         break;
     case lt_variable:
+    {
+        if (n->variable->space->type == space_t::name_space)
+        {
+            GenerateSpaceName(n->variable->space);
+        }
+        else if (n->variable->space->type == space_t::global_space)
+        {
+            Write("::");
+        }
+
         Write("%s", n->variable->name.c_str());
         break;
+    }
     case lt_inc:
         str = "++";
         break;
@@ -216,6 +237,9 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         break;
     case lt_integer:
         Write("%d", n->constant->integer_value);
+        break;
+    case lt_floatnumber:
+        Write("%f", n->constant->float_value);
         break;
     case lt_string:
         Write("\"%s\"", n->constant->char_pointer);
@@ -1239,9 +1263,24 @@ void restore_source_t::GenerateSpaceFunctions(bool definition)
     }
 }
 
+void restore_source_t::GenerateEmbeddedSpaces()
+{
+    std::map<std::string, namespace_t *>::iterator  space;
+    space = this->embedded_space_map.begin();
+    while (space != this->embedded_space_map.end())
+    {
+        IndentWrite("namespace %s\n", space->second->name.c_str());
+        PrintOpenBlock();
+        ((restore_source_t*)space->second)->GenerateSpace();
+        PrintCloseBlock(true);
+        ++space;
+    }
+}
+
 void restore_source_t::GenerateSpace()
 {
     this->GenerateSpaceTypes();
+    this->GenerateEmbeddedSpaces();
     bool is_methods = this->type == spacetype_t::structure_space;
     if (!is_methods)
     {

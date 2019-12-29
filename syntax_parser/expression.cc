@@ -164,7 +164,12 @@ void ExpressionParser::FixExpression(shunting_yard_t shunt, int prio)
                 operands.pop_back();
                 op.right = new shunting_yard_t(name);
             }
-            op.left = new shunting_yard_t(shunt);
+            if (operands.size() != 0)
+            {
+                shunting_yard_t  spacename = operands.back();
+                operands.pop_back();
+                op.left = new shunting_yard_t(spacename);
+            }
             operators.pop_back();
 			operands.push_back(op);
 			//shunt = op;
@@ -384,13 +389,18 @@ expression_node_t	*	ExpressionParser::CreateWordMode(std::string word, shunting_
 {
     expression_node_t	*	node = nullptr;
     variable_base_t     *   var = nullptr;
-
+    
+    static namespace_t         *   space = nullptr;
     do 
     {
-        // Check varible is a field of structured type
         if ((parent != nullptr))
         {
-            if ((parent->lexem == lt_dot || parent->lexem == lt_point_to))
+            if (parent->lexem == lt_namescope)
+            {
+                return nullptr;
+            }
+            // Check varible is a field of structured type
+            else if ((parent->lexem == lt_dot || parent->lexem == lt_point_to))
             {
                 if (left == nullptr)
                 {
@@ -525,6 +535,52 @@ expression_node_t	*	ExpressionParser::CreateWordMode(std::string word, shunting_
     return node;
 }
 
+static namespace_t * GetSpace(shunting_yard_t * yard, namespace_t * space)
+{
+    if (yard->lexem != lt_namescope)
+    {
+        space->CreateError(yard->line_number, -7776666, "Internal syntax parser error");
+        return nullptr;
+    }
+    if (yard->right == nullptr || yard->right->lexem != lt_word)
+    {
+        space->CreateError(yard->line_number, -7776666, "namespace scope error");
+        return nullptr;
+    }
+    shunting_yard_t * ptr = yard->left;
+    namespace_t * result = nullptr;
+
+    if (ptr == nullptr)
+    {
+        result = space;
+        while (result->parent != nullptr)
+            result = result->parent;
+    }
+    else switch (ptr->lexem)
+    {
+    case lt_namescope:
+    {
+        result = GetSpace(ptr, space);
+        if (result == nullptr)
+        {
+            space->CreateError(yard->line_number, -7776666, "namespace not found");
+            break;
+        }
+        result =  result->FindNamespaceInSpace(ptr->right->text);
+        break;
+    }
+    case lt_word:
+    {
+        result = space->FindNamespace(ptr->text);
+        break;
+    }
+
+    default:
+        space->CreateError(yard->line_number, -7776666, "Internal syntax parser error");
+    }
+    return result;
+}
+
 expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shunting_yard_t * parent, expression_node_t * left)
 {
     //if (yard->line_number == 664)
@@ -532,11 +588,19 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
     //    fprintf(stderr, "debug\n");
     //}
 	expression_node_t	*	node = nullptr;
-	expression_node_t	*	lvalue = yard->left ? !yard->unary ? CreateNode(yard->left, yard, nullptr) : nullptr : nullptr;
-	expression_node_t	*	rvalue = yard->right ? CreateNode(yard->right, yard, lvalue) : nullptr;
+	expression_node_t	*	lvalue = nullptr;
+	expression_node_t	*	rvalue = nullptr;
 	variable_base_t		*	var = nullptr;
 	type_t				*	cast = nullptr;
 	function_parser	    *	fptr = nullptr;
+
+    if (yard->lexem != lt_namescope)
+    {
+        if (yard->left && !yard->unary)
+            lvalue = CreateNode(yard->left, yard, nullptr);
+        if (yard->right)
+            rvalue = CreateNode(yard->right, yard, lvalue);
+    }
 
 	switch (yard->lexem)
 	{
@@ -865,14 +929,19 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
     }
 
 	case lt_namescope:
-		node = new expression_node_t(yard->lexem);
-		node->left = lvalue;
-		node->right = rvalue;
-		if (lvalue != nullptr)
-			node->type = lvalue->type;
-		else
-			fprintf(stderr, "Global namespace?\n");
-		break;
+    {
+        namespace_t * space = GetSpace(yard, this->space_state);
+        if (space != nullptr)
+        {
+            if (yard->right == nullptr || yard->right->lexem != lt_word)
+            {
+                this->space_state->CreateError(yard->line_number, -77716921, "rvalue error after ::");
+                break;
+            }
+            node = CheckWord(space, yard->right->text, true, rvalue, yard->line_number);
+        }
+        break;
+    }
 
 	case lt_openindex:
 		node = new expression_node_t(yard->lexem);
@@ -946,7 +1015,7 @@ shunting_yard_t * ExpressionParser::PrepareExpression()
 		{
 			shunting_yard op1 = operands.back();
 			operands.pop_back();
-			if (op.unary)
+			if (op.unary && op.lexem != lt_namescope)
 			{
 				op.right = new shunting_yard_t(op1);
 				operands.push_back(op);
@@ -1230,42 +1299,7 @@ void ExpressionParser::ParseOpenBracket(SourcePtr &node)
 
 		parent->lexem = node.lexem;
 //		fprintf(stderr, "Debug: Call method %s\n", node.value.c_str());
-#if true
         ParseArguments(&node, parent);
-#else
-        SourcePtr	seq(node.sequence);
-        if (node.sequence->size() > 0)
-		{
-			while (seq == true)
-			{
-                ExpressionParser	arg_parser(space_state);
-                shunting_yard_t		arg(seq);
-				arg_parser.ParseExpression(seq);
-				arg.lexem = lt_argument;
-				arg.left = arg_parser.PrepareExpression();
-				arg.left = new shunting_yard_t(*arg.left);
-				parent->right = new shunting_yard_t(arg);
-
-				if (seq == false)
-					break;
-
-				if (seq.lexem != lt_comma)
-				{
-					this->space_state->CreateError(node.line_number, -77749810, "wrong input on waiting arguments delimiter");
-					seq.Finish();
-					return;
-				}
-				seq++;
-				if (seq != true)
-				{
-					this->space_state->CreateError(node.line_number, -77749810, "expext arguments after delimiter");
-					seq.Finish();
-					return;
-				}
-				parent = parent->right;
-			}
-		}
-#endif
 		return;
 	}
 	else
@@ -1307,6 +1341,7 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
 {
 	lexem_type_t	prefix = lt_empty;
 	SourcePtr	node(source);
+    namespace_t * space = nullptr;
 	for (node = source; node != false; node != false ? node++ : node)
 	{
 		switch (node.lexem)
@@ -1323,19 +1358,24 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
             //			fprintf(stderr, "Semicolon separated expression\n");
             return node.lexem;
         }
+#if false
         case lt_namescope:
         {
             shunting_yard_t yard(source);
-            if (source.previous_lexem == lt_word)
+
+            if (prev_was_operand != true)
             {
-                if (operands.size() == 0)
-                    throw "mismatched scope";
+                yard.left = nullptr;
+            }
+            else
+            {
                 yard.left = new shunting_yard_t(operands.back());
                 operands.pop_back();
             }
             operators.push_back(yard);
             continue;
         }
+#endif
         case lt_new:
         {
             ParseOperator_NEW(node);

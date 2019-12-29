@@ -80,6 +80,7 @@ public:
 	{
 		index = items->begin();
 		eof = items->end();
+        previous_lexem = lt_empty;
 		if (items->size())
 		{
 			lexem = index->lexem;
@@ -131,7 +132,6 @@ typedef struct shunting_yard
 	{
 		switch (lexem)
 		{
-		case lt_namescope:
 		case lt_inc:
 		case lt_dec:
 		case lt_new:

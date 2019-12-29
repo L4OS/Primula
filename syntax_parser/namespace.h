@@ -30,6 +30,10 @@ public:
     std::map<std::string, variable_base_t*>         space_variables_map;
     std::map<std::string, class function_parser*>   function_map;
     std::map<std::string, int>                      enum_map;
+
+    std::map<std::string, namespace_t *>            embedded_space_map;
+    std::list<namespace_t *>                        using_space_list;
+
     std::map<std::string, function_parser*>         template_function_map;
     std::map<std::string, type_t*>                  template_types_map;
 
@@ -61,7 +65,8 @@ public:
 	static type_t	*	GetBuiltinType(lexem_type_t type);
 	type_t	*	TryLexenForType(SourcePtr & source);
 
-	int ParseStatement(Code::lexem_list_t statement);
+    void ParseUsing(SourcePtr &source);
+    int ParseStatement(Code::lexem_list_t statement);
 	int ParseStatement(SourcePtr &source);
 	function_overload_t *  CheckCostructorDestructor(linkage_t * linkage, type_t * type, std::string name, SourcePtr &source);
 	void CheckOverloadOperator(linkage_t * linkage, type_t * type, SourcePtr &overload);
@@ -90,6 +95,8 @@ public:
 
 	namespace_t * findBreakableSpace(bool continues);
 	namespace_t * findContinuableSpace();
+    namespace_t * FindNamespaceInSpace(std::string name);
+    namespace_t * FindNamespace(std::string name);
 
     // An old g++ does not like namaspace qualification in compound defintion. 
     // TODO: Move some qualification in test - we must support these qualifications

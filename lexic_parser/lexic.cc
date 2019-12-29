@@ -626,6 +626,7 @@ static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
 		if (ch == '.' && number_type == nt_decimal) 
         {
 			current_lexem[current_lexem_size++] = ch;
+            number_type = nt_float;
 			return 0;
 		}
 		if (number_type == nt_hexdecimal &&

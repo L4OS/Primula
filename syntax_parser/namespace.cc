@@ -4,8 +4,6 @@
 #  include <stdlib.h>
 #endif
 
-bool namespace_t::config_translate_ternary = true;
-
 type_t  namespace_t::builtin_types[18] =
 {
     /*  0 */		type_t("auto", type_t::auto_type, 0),
@@ -135,7 +133,7 @@ int namespace_t::CheckNamespace(SourcePtr &source)
             current_space->ParseStatement(*statement);
         }
 #endif
-        fprintf(stderr, "TODO: Register namespace %s\n", spacename.c_str());
+        this->embedded_space_map.insert(std::make_pair(spacename, current_space));
         current_space = current_space->Parent();
         source++;
         break;
@@ -145,6 +143,34 @@ int namespace_t::CheckNamespace(SourcePtr &source)
     }
 
     return 0;
+}
+
+namespace_t * namespace_t::FindNamespaceInSpace(std::string name)
+{
+    std::map<std::string, namespace_t*>::iterator pair;
+    pair = this->embedded_space_map.find(name);
+    if (pair != embedded_space_map.end())
+        return pair->second;
+    
+    parent_spaces_t::iterator  inherited = this->inherited_from.begin();
+    while (inherited != this->inherited_from.end())
+    {
+        namespace_t *   space = (*inherited)->space->FindNamespaceInSpace(name);
+        if (space != nullptr)
+            return space;
+        ++inherited;
+    }
+
+    return  nullptr;
+}
+
+namespace_t * namespace_t::FindNamespace(std::string name)
+{
+    namespace_t * space = FindNamespaceInSpace(name);
+    if (space)
+        return space;
+
+    return (parent == nullptr) ? nullptr : parent->FindNamespace(name);
 }
 
 variable_base_t * namespace_t::FindVariable(std::string name)
@@ -184,6 +210,16 @@ variable_base_t     *   namespace_t::FindVariableInspace(std::string name)
         ++pair->second->access_count;
         return pair->second;
     }
+
+    std::list<namespace_t *>::iterator used_space = this->using_space_list.begin();
+    while (used_space != this->using_space_list.end())
+    {
+        variable_base_t * var = (*used_space)->FindVariableInspace(name);
+        if (var != nullptr)
+            return var;
+        ++used_space;
+    }
+
     parent_spaces_t::iterator  inherited = this->inherited_from.begin();
     while (inherited != this->inherited_from.end())
     {
@@ -395,7 +431,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
             if (compound->prop == type_t::compound_type)
             {
                 if (source.lexem != lt_word)
-                    throw "Select statement FSM error: lexem is not word";
+                    throw "Select statement FSM error: lexeme is not word";
                 structure_t	* structure = (structure_t*)compound;
                 name = source.value;
                 source++;
@@ -714,6 +750,45 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
     }
 }
 
+void namespace_t::ParseUsing(SourcePtr &source)
+{
+    ++source;
+    if (source == false)
+    {
+        CreateError(source.line_number, -7770101, "unterminated statement 'using'");
+        return;
+    }
+    if (source.lexem != lt_namespace)
+    {
+        CreateError(source.line_number, -7770101, "FSM error on parsing 'using' statememt");
+        return;
+    }
+    ++source;
+    if (source.lexem != lt_word)
+    {
+        CreateError(source.line_number, -7770102, "expected name of using space");
+        source.Finish();
+        return;
+    }
+    namespace_t * space = FindNamespace(source.value);
+    if (space == nullptr)
+    {
+        CreateError(source.line_number, -7770102, "namespace '%s' not found", source.value.c_str());
+        return;
+    }
+
+    // https://en.cppreference.com/w/cpp/language/namespace#Using-directives
+    if(space->parent == this)
+        using_space_list.push_back(space);
+    else
+    {
+        namespace_t * global = this;
+        while (global->parent)
+            global = global->parent;
+        global->using_space_list.push_back(space);
+    }
+}
+
 int namespace_t::ParseStatement(SourcePtr &source)
 {
     enum {
@@ -739,6 +814,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
     variable_base_t                 *	variable = nullptr;
     function_parser                 *	function = nullptr;
     statement_t						*	code = nullptr;
+    namespace_t                     *   space = nullptr;
 
     static int debug_line = 0;
     while (source != false)
@@ -1199,6 +1275,10 @@ int namespace_t::ParseStatement(SourcePtr &source)
             source++;
             break;
 
+            case lt_using:
+                ParseUsing(source);
+                continue;
+
             case lt_word:
                 type = TryLexenForType(source);
                 if (type != nullptr)
@@ -1335,6 +1415,15 @@ int namespace_t::ParseStatement(SourcePtr &source)
                     source.Finish();
                     continue;
                 }
+                space = FindNamespace(source.value);
+                if (space != nullptr)
+                {
+                    expression_t  *  code = ParseExpression(source);
+                    this->space_code.push_back(code);
+                    state = wait_delimiter_state;
+                    continue;
+                }
+
                 if (source == true)
                 {
                     std::string str = source.value;

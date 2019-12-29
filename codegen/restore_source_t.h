@@ -12,6 +12,7 @@ class restore_source_t :
     void GenerateFunctionOverload(function_overload_t * overload, bool proto);
     void GenerateFunction(function_parser * f, bool is_methos, bool proto);
 
+    void GenerateEmbeddedSpaces();
     void GenerateSpace();
 
 public:
