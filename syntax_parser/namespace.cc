@@ -1311,10 +1311,6 @@ int namespace_t::ParseStatement(SourcePtr &source)
                         continue;
                     }
 
-                    if (config_translate_ternary)
-                    {
-                        TranslateTernaryOperation(code);
-                    }
                     //
                     // add expressiob to list
                     //

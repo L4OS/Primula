@@ -177,13 +177,17 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         break;
     case lt_variable:
     {
-        if (n->variable->space->type == space_t::name_space)
+        namespace_t * space = n->variable->space;
+        if (space != nullptr)
         {
-            GenerateSpaceName(n->variable->space);
-        }
-        else if (n->variable->space->type == space_t::global_space)
-        {
-            Write("::");
+            if (space->type == space_t::name_space)
+            {
+                GenerateSpaceName(n->variable->space);
+            }
+            else if (space->type == space_t::global_space)
+            {
+                Write("::");
+            }
         }
 
         Write("%s", n->variable->name.c_str());
@@ -339,6 +343,9 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         {
         case type_t::pointer_type:
             type = ((pointer_t*)type)->parent_type;
+            break;
+        case type_t::dimension_type:
+            type = ((array_t*)type)->child_type;
             break;
         default:
             throw "type must be pointer or array";
@@ -1257,6 +1264,10 @@ void restore_source_t::GenerateSpaceFunctions(bool definition)
                 {
                     if (!definition)
                         GenerateFunctionOverload(*overload, true);
+                    else
+                    {
+                        GenerateFunctionOverload(*overload, false);
+                    }
                 }
             }
         }

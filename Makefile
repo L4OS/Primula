@@ -1,5 +1,5 @@
 all: 
-		make -C lexic_parser 
+		make -C lexical_parser 
 		make -C syntax_parser 
 
 check:

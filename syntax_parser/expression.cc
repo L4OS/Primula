@@ -971,7 +971,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 			node->right = rvalue;
 			node->is_constant = rvalue->is_constant;
 		}
-		node->type = new pointer_t(yard->type);
+        node->type = yard->type->prop == type_t::dimension_type ? yard->type : new pointer_t(yard->type);
 		break;
 
 	case lt_argument:
@@ -1097,18 +1097,17 @@ void ExpressionParser::ParseOperator_NEW(SourcePtr &source)
             SourcePtr ptr(source.sequence);
             index_parser.ParseExpression(ptr);
 #endif
-            expression_t * expr = index_parser.BuildExpression();
-            if (expr->is_constant == false)
+            index_parser.PrepareExpression();
+            if (index_parser.operands.size() != 1 || index_parser.operators.size() != 0)
             {
-                this->space_state->CreateError(source.line_number, -77791004, "Non-constant index expression not supported");
+                this->space_state->CreateError(source.line_number, -77771234, "Expression broken in operator new");
+                source.Finish();
                 continue;
             }
-            //			printf("Complete index parsing in operator 'new'\n");
-            yard->type = new array_t(yard->type, 5);
-
+            yard->type = new array_t(yard->type, 0);
             shunting_yard_t * rval = new shunting_yard_t(index_parser.operands.back());
             this->operands.push_back(*rval);
-            //			FixExpression(*yard, priority);
+
             source++;
             break;
         }
@@ -1525,6 +1524,11 @@ expression_t  * namespace_t::ParseExpression(SourcePtr &source)
         expression->root = FixConstants(expression->root);
         expression->type = expression->root->type;
         expression->is_constant = expression->root->is_constant;
+
+        if (config_translate_ternary)
+        {
+            TranslateTernaryOperation(expression);
+        }
     }
 	return expression;
 }
