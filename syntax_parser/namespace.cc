@@ -253,7 +253,6 @@ function_parser		* namespace_t::FindFunctionInSpace(std::string name)
     pair = function_map.find(name);
     if (pair != function_map.end())
     {
-        ++pair->second->access_count;
         return pair->second;
     }
     function_parser * f = nullptr;;

@@ -1357,24 +1357,6 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
             //			fprintf(stderr, "Semicolon separated expression\n");
             return node.lexem;
         }
-#if false
-        case lt_namescope:
-        {
-            shunting_yard_t yard(source);
-
-            if (prev_was_operand != true)
-            {
-                yard.left = nullptr;
-            }
-            else
-            {
-                yard.left = new shunting_yard_t(operands.back());
-                operands.pop_back();
-            }
-            operators.push_back(yard);
-            continue;
-        }
-#endif
         case lt_new:
         {
             ParseOperator_NEW(node);

@@ -704,7 +704,7 @@ void restore_source_t::GenerateFunction(function_parser * f, bool is_method, boo
     {
         if (type == space_t::structure_space ||
             !opt_HideUnusedPrototypes ||
-            (*overload)->function->access_count > 0)
+            (*overload)->access_count > 0)
         {
             if ((*overload)->linkage.inlined ^ proto)
                 GenerateFunctionOverload(*overload, proto);

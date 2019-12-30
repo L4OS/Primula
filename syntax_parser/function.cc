@@ -512,6 +512,7 @@ void function_parser::FindBestFunctionOverload(call_t * call)
 	if (call->code != nullptr)
 	{
 //		printf("found calling function %s%s\n", this->name.c_str(), call->code->mangle.c_str());
+        ++call->code->access_count;
 	}
 	else
 	{
