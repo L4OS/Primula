@@ -21,6 +21,7 @@ typedef std::list<farg_t>	arg_list_t;
 
 struct function_overload_t
 {
+    int                         access_count;
 	std::string					mangle;		// Without parent name
 	class function_parser		*	function;
 	arg_list_t					arguments;
@@ -32,13 +33,17 @@ struct function_overload_t
 
 	void Parse(int line_num, namespace_t * parent, Code::statement_list_t * source); // TODO: move to parser space
 	Code::statement_list_t		*	source_code;	// For second pass. TODO: move to parser space
+
+    function_overload_t()
+    {
+        access_count = 0;
+    }
 };
 
 typedef std::list<function_overload_t *> function_overload_list_t;
 
 struct function_t : public type_t
 {
-    int                                         access_count;
 	std::string									name;
 	type_t									*	type;
 	function_overload_list_t					overload_list;
@@ -49,7 +54,6 @@ struct function_t : public type_t
 		std::string			name)
 			: type_t(type->name.c_str(), funct_ptr_type, type->bitsize)
 	{
-        access_count = 0;
 		this->name = name;
 		this->type = type;
 		method_type = method;
