@@ -31,7 +31,7 @@ private:
 	variable_base_t		*	FindVariable(shunting_yard_t * pYard);
 	type_t *				CreateType(shunting_yard_t * yard);
 	expression_node_t	*	CreateNode(shunting_yard_t * yard, shunting_yard_t * parent, expression_node_t * left);
-	constant_node_t		*	CreateConstant(shunting_yard_t * yard);
+	void                    CreateConstant(reg_t * reg, shunting_yard_t * yard);
 	int						Parse(SourcePtr &source);
 	void					FixExpression(shunting_yard_t shunt, int prio);
 	void					PrepareArguments(call_t * call, expression_node_t * arg);
@@ -251,9 +251,8 @@ type_t * ExpressionParser::CreateType(shunting_yard_t * yard)
 	return this->space_state->FindType(yard->text);
 }
 
-constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
+void ExpressionParser::CreateConstant(reg_t * constant, shunting_yard_t * yard)
 {
-	constant_node_t * constant = nullptr;
 	switch (yard->lexem)
 	{
 	case lt_character:
@@ -282,7 +281,7 @@ constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
         default:
             throw "Character sequence not parsed";
         }
-        constant = new constant_node_t(ch);
+        constant->integer_value = (ch);
         break;
     }
 
@@ -294,21 +293,27 @@ constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
             constant = new constant_node_t(std::stoi(yard->text));
 #else
         if (yard->text.rfind("0x", 0) == 0)
-            constant = new constant_node_t((int)strtol(yard->text.c_str(), nullptr, 16));
+        {
+            constant = new reg_t;
+            constant->integer_value = ((int)strtol(yard->text.c_str(), nullptr, 16));
+        }
         else
-            constant = new constant_node_t(atoi(yard->text.c_str()));
+        {
+            constant->integer_value = (atoi(yard->text.c_str()));
+        }
 #endif
 		break;
 
 	case lt_string:
-		constant = new constant_node_t(yard->text.c_str());
+        constant->char_pointer = new char[yard->text.size() + 1];
+        strcpy((char*) constant->char_pointer, yard->text.c_str());
 		break;
 
 	case lt_floatnumber:
 #if MODERN_COMPILER
         constant = new constant_node_t(std::stof(yard->text));
 #else
-        constant = new constant_node_t((float) atof(yard->text.c_str()));
+        constant->float_value = ((float)atof(yard->text.c_str()));
 #endif
 		break;
 
@@ -316,14 +321,16 @@ constant_node_t * ExpressionParser::CreateConstant(shunting_yard_t * yard)
 		throw "Constant not parsed";
 	}
 
-	return constant;
+	return;
 }
 
 void ExpressionParser::PrepareArguments(call_t * call, expression_node_t * arg)
 {
+
 	while (arg != nullptr)
 	{
 		expression_t	* arg_expr = new expression_t(arg->left);
+        call->argument_frame_size += arg_expr->type->bitsize >> 3;
 		call->arguments.push_back(arg_expr);
 		arg = arg->right;
 	}
@@ -372,7 +379,7 @@ expression_node_t * ExpressionParser::CheckWord(
                 node = new expression_node_t(lt_integer);
                 node->type = space->GetBuiltinType(lt_type_int);
                 node->is_constant = true;
-                node->constant = new constant_node_t(333);
+                node->value.integer_value = (333333);
                 break;
             }
             space->CreateError(line_num, -77716721, "unparsed statement '%s' ", name.c_str());
@@ -468,18 +475,35 @@ expression_node_t	*	ExpressionParser::CreateWordMode(std::string word, shunting_
                         type = ((typedef_t*)type)->type;
                     if (parent->lexem == lt_point_to)
                     {
+#if false
+                        switch (type->prop)
+                        {
+                        case type_t::pointer_type:
+                            type = ((pointer_t*)type)->parent_type;
+                            break;
+ /*                       case type_t::compound_type:
+                            fprintf(stderr, "field of compound type\n");
+                            break;
+ */
+                        default:
+//                            throw "field operation internal error";
+                            space_state->CreateError(line_num, -77716761, "non-pointer type '%s' ", left->variable->name.c_str());
+                            break;
+                        }
+#else
                         if (type->prop != type_t::pointer_type)
                         {
-                            space_state->CreateError(line_num, -77716721, "non-pointer type '%s' ", left->variable->name.c_str());
+                            space_state->CreateError(line_num, -77716761, "non-pointer type '%s' ", left->variable->name.c_str());
                             break;
                         }
                         type = ((pointer_t*)type)->parent_type;
+#endif
                     }
                     while (type->prop == type_t::typedef_type)
                         type = ((typedef_t*)type)->type;
                     if (type->prop != type_t::compound_type)
                     {
-                        space_state->CreateError(line_num, -77716721, "unparsed statement '%s' ", word.c_str());
+                        space_state->CreateError(line_num, -77716762, "unparsed statement '%s' ", word.c_str());
                         break;
                     }
                     typedef structure_t * pstructure_t;
@@ -513,7 +537,7 @@ expression_node_t	*	ExpressionParser::CreateWordMode(std::string word, shunting_
                     } while (run);
                     if (space == nullptr)
                     {
-                        this->space_state->CreateError(line_num, -77716721, "variable '%s' not found", parent->left->text.c_str());
+                        this->space_state->CreateError(line_num, -77716763, "variable '%s' not found", parent->left->text.c_str());
                         break;
                     }
                     node = CheckWord(space, word, left, rvalue, line_num);
@@ -609,7 +633,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		node = new expression_node_t(yard->lexem);
 		node->type = this->space_state->GetBuiltinType(lt_type_char);
 		node->is_constant = true;
-		node->constant = CreateConstant(yard);
+		CreateConstant(&node->value, yard);
 		break;
 	}
 	case lt_integer:
@@ -617,7 +641,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		node = new expression_node_t(yard->lexem);
 		node->type = this->space_state->GetBuiltinType(lt_type_int);
 		node->is_constant = true;
-		node->constant = CreateConstant(yard);
+		CreateConstant(&node->value, yard);
 		break;
 	}
 	case lt_string:
@@ -627,7 +651,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		node->type = new const_t(node->type);
 		node->type = new pointer_t(node->type);
 		node->is_constant = true;
-		node->constant = CreateConstant(yard);
+		CreateConstant(&node->value, yard);
 		break;
 	}
 	case lt_floatnumber:
@@ -635,7 +659,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
 		node = new expression_node_t(yard->lexem);
 		node->type = this->space_state->GetBuiltinType(lt_type_float);
 		node->is_constant = true;
-		node->constant = CreateConstant(yard);
+		CreateConstant(&node->value, yard);
 		break;
 	}
 	case lt_true:
@@ -890,7 +914,7 @@ expression_node_t	*	ExpressionParser::CreateNode(shunting_yard_t * yard, shuntin
             node->left->left = lvalue;
             node->left->right = new expression_node_t(lt_integer);
             node->left->right->is_constant = true;
-            node->left->right->constant = new constant_node_t(0);
+//            node->left->right->constant = new constant_node_t;
             break;
 
         default:
@@ -1421,45 +1445,45 @@ lexem_type_t ExpressionParser::ParseExpression(SourcePtr &source)
 
 expression_node_t * FixConstants(expression_node_t * node)
 {
-	constant_node_t * lc = nullptr, *rc = nullptr;
+//	reg_t * lc = nullptr, *rc = nullptr;
 	if (node->left)
 	{
 		node->left = FixConstants(node->left);
-		lc = node->left->constant;
+//		lc = &node->left->value;
 	}
 	if (node->right)
 	{
 		node->right = FixConstants(node->right);
-		rc = node->right->constant;
+//		rc = &node->right->value;
 	}
 
 	int val;
 
-	if (lc != nullptr && rc != nullptr)
+	if (node->left != nullptr && node->right != nullptr && node->left->is_constant && node->right->is_constant )
 	{
 
 		switch (node->lexem)
 		{
 		case lt_add:
-			val = node->left->constant->integer_value + node->right->constant->integer_value;
+			val = node->left->value.integer_value + node->right->value.integer_value;
 			break;
 		case lt_sub:
-			val = node->left->constant->integer_value - node->right->constant->integer_value;
+			val = node->left->value.integer_value - node->right->value.integer_value;
 			break;
 		case lt_mul:
-			val = node->left->constant->integer_value * node->right->constant->integer_value;
+			val = node->left->value.integer_value * node->right->value.integer_value;
 			break;
 		case lt_div:
-			val = node->left->constant->integer_value / node->right->constant->integer_value;
+			val = node->left->value.integer_value / node->right->value.integer_value;
 			break;
         case lt_rest:
-            val = node->left->constant->integer_value % node->right->constant->integer_value;
+            val = node->left->value.integer_value % node->right->value.integer_value;
             break;
         case lt_shift_left:
-			val = node->left->constant->integer_value <<= node->right->constant->integer_value;
+			val = node->left->value.integer_value <<= node->right->value.integer_value;
 			break;
 		case lt_shift_right:
-			val = node->left->constant->integer_value >>= node->right->constant->integer_value;
+			val = node->left->value.integer_value >>= node->right->value.integer_value;
 			break;
         case lt_colon:
             return node;
@@ -1468,22 +1492,22 @@ expression_node_t * FixConstants(expression_node_t * node)
 			throw "Check operation";
 		}
 
-        node->constant = new constant_node_t(val);
 		node->lexem = lt_integer;
         node->is_constant = true;
+        node->value.integer_value = (val);
     }
 
-	if (node->constant != nullptr)
+	if (node->is_constant)
 	{
 		if (node->left)
 		{
 			delete node->left;
-			node->left = 0;
+			node->left = nullptr;
 		}
 		if (node->right)
 		{
 			delete node->right;
-			node->right = 0;
+			node->right = nullptr;
 		}
 	}
 	return node;
@@ -1537,7 +1561,7 @@ expression_t  * namespace_t::ParseExpressionExtended(SourcePtr &source, type_t *
 		if (name_ptr != false && name_ptr.lexem == lt_word)
 		{
 			linkage_t	linkage;
-			variable_base_t * instance = CreateVariable(*p_type, name_ptr.value, &linkage);
+			variable_base_t * instance = CreateVariable(*p_type, name_ptr.value, FindSegmentType(&linkage));
 			instance->hide = hide;
 			continue;
 		}
@@ -1575,8 +1599,8 @@ expression_node_t::expression_node_t(lexem_type_t	lexem)
 		type = nullptr;
 	}
 	variable = nullptr;
-	constant = nullptr;
-	left = right = nullptr;
+
+    left = right = nullptr;
 	call = nullptr;
 }
 

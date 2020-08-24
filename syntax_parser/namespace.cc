@@ -26,6 +26,16 @@ type_t  namespace_t::builtin_types[18] =
     /* 17 */		type_t("__int64", type_t::signed_type, 64)
 };
 
+Errors                                   namespace_t::errors;
+
+void namespace_t::RegisterBuiltinTypes()
+{
+    for (int i = 0; i < sizeof(builtin_types) / sizeof(builtin_types[0]); ++i)
+    {
+        this->CreateType( &builtin_types[i], builtin_types[i].name);
+    }
+}
+
 type_t	*	namespace_t::GetBuiltinType(lexem_type_t type)
 {
     switch (type)
@@ -71,6 +81,28 @@ void namespace_t::CreateError(int linenum, int error, std::string description, .
         throw "Trying to log error into not declared namespace";
 }
 
+variable_segment_t namespace_t::FindSegmentType(linkage_t * linkage) 
+{
+    switch (linkage->storage_class)
+    {
+    case linkage_t::sc_default:
+        switch (this->type)
+        {
+        case global_space:
+            return vs_global;
+        default:
+            throw "namespace_t::FindSegmentType - space type not parsed";
+        }
+        break;
+    case linkage_t::sc_extern:
+        fprintf(stderr, "Interpreter: extern variable not supported. Redefine as global varibale\n");
+        return vs_global;
+        break;
+    default:
+        throw "namespace_t::FindSegmentType - storage class not parsed";
+    }
+}
+
 
 type_t * namespace_t::TryLexenForType(SourcePtr &source)
 {
@@ -106,6 +138,84 @@ void InitialNamespace(namespace_t * space)
 {
     current_space = space;
 }
+
+// Interpeter allocates raw memory for local variables
+
+/*
+void namespace_t::AllocateLocalVariablePool(std::list<common_value_t> * calculated_arguments)
+{
+    int argument_frame_size = calculated_arguments ? calculated_arguments->size() << 2 : 0; // 32bits
+    int stack_size = non_static_variable_pool_size + argument_frame_size;
+    if (stack_size == 0)
+    {
+        local_argument_space = nullptr;
+        local_variable_space = nullptr;
+        return;
+    }
+
+    local_argument_space = new char[stack_size];
+
+    if (argument_frame_size != 0)
+    {
+        fprintf(stderr, "Allocated %d bytes for arguments of '%s' : 0x%p\n",
+            argument_frame_size,
+            this->name.c_str(),
+            local_argument_space);
+
+        int * argument_frame = (int*)local_argument_space;
+        for (auto var : *calculated_arguments)
+        {
+                fprintf(stderr, "Set argument on 0x%p to %d\n", argument_frame, var.i32);
+                *argument_frame++ = var.i32;
+        }
+    }
+
+    if (non_static_variable_pool_size != 0)
+    {
+//        local_variable_space = new char[non_static_variable_pool_size];
+
+        local_variable_space = &local_argument_space[argument_frame_size];
+
+        fprintf(stderr, "Allocated %d bytes for local variables of '%s' : 0x%p\n",
+            non_static_variable_pool_size,
+            this->name.c_str(),
+            local_variable_space);
+
+        for (auto var : this->space_variables_list)
+        {
+            if (var->value.char_pointer != nullptr)
+            {
+                fprintf(stderr, "Found constant data. TODO: check static variable\n");
+                char * offset = local_variable_space + var->value.offset;
+
+                // Byte by byte copy static data to local variable
+                for (int i = 0; i < non_static_variable_pool_size; ++i)
+                {
+                    offset[i] = var->value.char_pointer[i];
+                }
+            }
+        }
+    }
+    else
+        local_variable_space = nullptr;
+
+}
+
+void namespace_t::ReleaseLocalVariablePool()
+{
+    if (local_argument_space != nullptr)
+    {
+        fprintf(stderr, "Deleted %d bytes on 0x%p of arguments and local variables of '%s'\n",
+            non_static_variable_pool_size,
+            local_argument_space,
+            this->name.c_str());
+        delete local_argument_space;
+        local_argument_space = nullptr;
+        local_variable_space = nullptr;
+    }
+}
+*/
+
 
 int namespace_t::CheckNamespace(SourcePtr &source)
 {
@@ -293,12 +403,39 @@ function_parser		* namespace_t::FindTemplateFunction(std::string name)
     return nullptr;
 }
 
-variable_base_t * namespace_t::CreateVariable(type_t * type, std::string name, linkage_t * linkage)
+variable_base_t::variable_base_t(
+    namespace_t		*	space,
+    type_t			*	type,
+    std::string			name,
+    variable_segment_t storage)
+    : statement_t(statement_t::_variable)
 {
-    variable_base_t * variable = new variable_base_t(this, type, name, linkage->storage_class);
+    access_count = 0;
+    this->space = space;
+    this->type = type;
+    this->name = name;
+    this->storage = storage;
+    declaration = nullptr;
+#if COMPILER
+    static_data = nullptr;
+#else
+#endif
+    hide = false; // This is useful for reconstruction to source code of "for" loop
+//        printf("Create variable: %s %p\n", name.c_str(), this);
+}
+
+variable_base_t * namespace_t::CreateVariable(type_t * type, std::string name, variable_segment_t  segment)
+{
+    variable_base_t * variable = new variable_base_t(this, type, name, segment);
     space_variables_map.insert(std::make_pair(name, variable));
     space_variables_list.push_back(variable);
     this->space_code.push_back(variable);
+#if ! COMPILER
+    {
+        variable->value.offset = non_static_variable_pool_size;
+        non_static_variable_pool_size += (variable->type->bitsize >> 3);
+    }
+#endif
     return variable;
 }
 
@@ -457,7 +594,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
             source.Finish();
             return;
         }
-        variable = CreateVariable(type, name, linkage);
+        variable = CreateVariable(type, name, FindSegmentType(linkage));
         if (source.lexem == lt_semicolon)
             return;
         if (source.lexem == lt_comma)
@@ -467,7 +604,17 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
             source++;
             if (source.lexem == lt_openblock)
             {
+#if COMPILER
                 variable->static_data = BraceEncodedInitialization(type, source);
+#else
+                fprintf(stderr, "%d bytes constant area allocation for variable '%s'\n", type->bitsize >> 3, variable->name.c_str());
+                variable->value.char_pointer = new char[type->bitsize>>3];
+                char  * eop =  (char *) PackDefinitionToMemory(type, source, (unsigned int *) variable->value.char_pointer);
+                if (variable->value.char_pointer + (type->bitsize >> 3) != eop)
+                {
+                    fprintf(stderr, "Data not aligned to structure boundary\n");
+                }
+#endif
                 return;
             }
             expression_t * assign = ParseExpression(source);
@@ -475,7 +622,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
             {
                 bool is_zero = assign->is_constant ?
                     assign->type->prop == type_t::signed_type ?
-                    (assign->root->constant->integer_value == 0) : false : false;
+                    (assign->root->value.integer_value == 0) : false : false;
 
                 //if (source.line_number == 701)
                 //    printf("debug\n");
@@ -540,7 +687,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                     fprintf(stderr, "This is an instance of %s %s(%s)\n", type->name.c_str(), name.c_str(), args.value.c_str());
                     // TODO: Check that constructor is matched to arguemts
 
-                    variable_base_t * instance = CreateVariable(type, name, linkage);
+                    variable_base_t * instance = CreateVariable(type, name, FindSegmentType(linkage));
                     if (type->prop != type_t::compound_type)
                     {
                         throw "Default constructors for non-compound types is not implemented yet";
@@ -565,7 +712,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                 case lt_class:
                 case lt_enum:
                 case lt_word:
-                    variable = CreateVariable(type, name, linkage);
+                    variable = CreateVariable(type, name, FindSegmentType(linkage));
                     if (variable->type->prop == type_t::compound_type)
                     {
                         structure_t *  st = (structure_t*)variable->type;
@@ -710,12 +857,12 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                     return;
                 }
                 // Check size of dimension
-                int dimsize = expr->root->constant->integer_value;
+                int dimsize = expr->root->value.integer_value;
                 type = new array_t(type, dimsize);
             }
             source++;
         } while (source == true && source.lexem == lt_openindex);
-        variable = CreateVariable(type, name, linkage);
+        variable = CreateVariable(type, name, FindSegmentType(linkage));
         return;
 
     case lt_colon:
@@ -739,7 +886,7 @@ void namespace_t::SelectStatement(type_t * type, linkage_t * linkage, std::strin
                 source.Finish();
                 return;
             }
-            variable = CreateVariable(type, name, linkage);
+            variable = CreateVariable(type, name, FindSegmentType(linkage));
         }
         return;
 
@@ -928,7 +1075,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
                 switch (source.lexem)
                 {
                 case lt_semicolon:
-                    v = new variable_base_t(this, vartype, name, linkage.storage_class);
+                    v = new variable_base_t(this, vartype, name, FindSegmentType(&linkage));
                     throw "FSM error: Lost variable";
                     break;
                 case lt_openbraket:
@@ -955,7 +1102,7 @@ int namespace_t::ParseStatement(SourcePtr &source)
                             parent->parent_type = f->function->type;
                         }
                     }
-                    v = new variable_base_t(this, vartype, name, linkage.storage_class);
+                    v = new variable_base_t(this, vartype, name, FindSegmentType(&linkage));
                     space_variables_map.insert(std::make_pair(v->name, v));
                     space_variables_list.push_back(v);
                     source++;
@@ -1085,13 +1232,29 @@ int namespace_t::ParseStatement(SourcePtr &source)
                 {
                     throw "Internal syntax parser error in namespace_t::ParseStatement";
                 }
+#if COMPILER
                 variable->static_data = BraceEncodedInitialization(variable->type, source);
                 if (variable->static_data->type != lt_openblock)
                     throw "Second Internal syntax parser error in namespace_t::ParseStatement";
+#else
+                {
+                    variable->value.char_pointer = new char[variable->type->bitsize >> 3];
+                    char * eod = (char *)PackDefinitionToMemory(variable->type, source, (unsigned int *)variable->value.char_pointer);
+                    if (eod - variable->value.char_pointer != variable->type->bitsize >> 3)
+                    {
+                        fprintf(stderr, "Data synch lost at variavle initialization\n");
+                    }
+               }
+#endif
                 if (variable->type->prop == type_t::dimension_type)
                 {
                     array_t * array = (array_t*)variable->type;
+#if COMPILER
                     int real_count = variable->static_data->nested->size();
+#else
+                    int real_count = array->items_count;;
+                    fprintf(stderr, "Check real elemnts count of array\n");
+#endif
                     int type_count = array->items_count;
                     if (type_count == 0 && array->bitsize == 32)
                     {

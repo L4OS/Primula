@@ -20,7 +20,7 @@ expression_node_t * namespace_t::TryEnumeration(std::string name)
         node = new expression_node_t(lt_integer);
         node->type = this->GetBuiltinType(lt_type_int);
         node->is_constant = true;
-        node->constant = new constant_node_t(val);
+        node->value.integer_value = (val);
     }
     else if (parent != nullptr)
         return parent->TryEnumeration(name);
@@ -64,9 +64,13 @@ variable_base_t * namespace_t::TryEnumeration(std::string name, bool self_space)
 #endif
 			if (pair == en->enumeration.end())
 				continue;
-
-			result = new variable_base_t(this, type, name, linkage_t::sc_default);
+            linkage_t linkage;
+			result = new variable_base_t(this, type, name, FindSegmentType(&linkage));
+#if COMPILER
 			result->static_data = new static_data(pair->second);
+#else
+            result->value.char_pointer = (char*) (pair->second);
+#endif
 			return result;
 		}
 	}

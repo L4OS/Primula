@@ -4,34 +4,21 @@
 #include "type_t.h"
 #include <string.h>
 
-class constant_node_t
+class reg_t
 {
 public:
+    // To be union
     int				integer_value;
-    float			float_value;
+    int             offset;
     const char	*	char_pointer;
-    constant_node_t(char c)
-    {
-        integer_value = c;
-    }
-    constant_node_t(int v)
-    {
-        integer_value = v;
-        float_value = 0;
-        char_pointer = nullptr;
-    }
-    constant_node_t(float v)
-    {
-        integer_value = 0;
-        float_value = v;
-        char_pointer = nullptr;
-    }
-    constant_node_t(const char * v)
+    float			float_value;
+
+    reg_t()
     {
         integer_value = 0;
         float_value = 0;
-        char_pointer = new char[1 + strlen(v)];
-        strcpy((char*)char_pointer, v);
+        char_pointer = nullptr;
+        offset = 0;
     }
 };
 
@@ -45,14 +32,20 @@ public:
 	expression_node_t		*	right;
 	class variable_base_t	*	variable;
 	class  call_t			*	call;
-	constant_node_t	        *	constant;
+    reg_t	        	    value;
 
 	expression_node_t(lexem_type_t	lexem);
 	expression_node_t(const expression_node_t * node);
 
+#if true // Interpretaror
+    expression_node_t()
+    {
+        lexem = lt_empty;
+    }
+#endif
     bool IsConstZero()
     {
-        return ((lexem == lt_integer) & is_constant) && (constant->integer_value == 0);
+        return ((lexem == lt_integer) & is_constant) && (value.integer_value == 0);
     }
 };
 
@@ -93,26 +86,24 @@ public:
 	type_t						*	type;
 	class namespace_t			*	space;
 	class statement_t			*	declaration;
+#if COMPILER
 	static_data_t				*	static_data;
-	linkage_t::storage_class_t		storage;
+#else
+    reg_t	        	            value;
+
+#if ! COMPILER
+    char                        *   GetPayloadAddress(class run_call_t * context);
+#endif
+
+#endif
+    variable_segment_t		        storage;
 	bool							hide;
 
-	variable_base_t(
-		namespace_t		*	space,
-		type_t			*	type,
-		std::string			name,
-		linkage_t::storage_class_t storage)
-		: statement_t(statement_t::_variable)
-	{
-        access_count = 0;
-		this->space = space;
-		this->type = type;
-		this->name = name;
-		this->storage = storage;
-		declaration = nullptr;
-		static_data = nullptr;
-		hide = false; // This is useful for reconstruction to source code of "for" loop
-	}
+    variable_base_t(
+        namespace_t		*	space,
+        type_t			*	type,
+        std::string			name,
+        variable_segment_t storage);
 };
 
 class codeblock_t :public statement_t
@@ -150,12 +141,14 @@ public:
 	namespace_t						*	caller;
 	struct function_overload_t		*	code;
 	std::list<expression_t *>			arguments;
+    int                                 argument_frame_size;
 
 	call_t(namespace_t * caller_space, std::string name, struct function_overload_t * c) : statement_t(_call)
 	{
 		this->name = name;
 		caller = caller_space;
 		code = c;
+        argument_frame_size = 0;
 	}
 };
 
@@ -228,7 +221,7 @@ public:
 #if GOOD
 	variable_base_t		*	exception;
 #else
-	constant_node_t		*	exception_constant;
+	reg_t		        *	exception_constant;
 #endif
 	operator_THROW() : statement_t(_throw)
 	{}

@@ -291,7 +291,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 				instance_structure->space = new namespace_t(this, namespace_t::structure_space, instance_structure->name);
 				instance_structure->space->TranslateNamespace(template_structure->space, source.line_number);
 
-				instance = new variable_base_t(instance_structure->space, instance_structure, source.value, linkage->storage_class);
+				instance = new variable_base_t(instance_structure->space, instance_structure, source.value, FindSegmentType(linkage));
 
 				space_types_map.insert(std::make_pair(instance->type->name, instance->type));
 				space_types_list.push_back(instance->type);
@@ -305,7 +305,7 @@ variable_base_t * namespace_t::CreateObjectFromTemplate(type_t * type, linkage_t
 			// TODO: Select approperiare constructor
 			if (source.lexem == lt_openbraket)
 			{
-				call_t	* call_constructor;
+				call_t	* call_constructor = nullptr;
 				function_parser * constructor = instance_structure->space->FindFunction(instance_structure->name);
 				function_overload_parser * overload = new function_overload_parser(constructor, linkage);
 				if (constructor != nullptr)
@@ -506,17 +506,21 @@ function_parser	* namespace_t::CreateFunctionInstance(function_parser * func, in
             a != (*overload)->arguments.end();
             ++a )
         {
-            t = TryTranslateType(a->type);
+            t = TryTranslateType((*a)->type);
             if (!t)
             {
-                CreateError(line_number, -7775102, "Cannot find argument type '%s'", a->type->name.c_str());
+                CreateError(line_number, -7775102, "Cannot find argument type '%s'", (*a)->type->name.c_str());
                 delete instance;
                 instance = nullptr;
                 break;
             }
+#if false
             farg_t		arg(*a);
             arg.type = t;
             instance_overload->arguments.push_back(arg);
+#else
+            instance_overload->arguments.push_back((*a));
+#endif
         }
         instance_overload->MangleArguments();
         instance->overload_list.push_back(instance_overload);
@@ -542,7 +546,7 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
     // We need here select best fit function from list of templated functions
     // But now we just take first
 
-    std::list<farg_t>::iterator arg_ptr;
+    std::list<farg_t*>::iterator arg_ptr;
     function_overload_list_t::iterator  temp_func;
     for (
         temp_func = func->overload_list.begin();
@@ -579,14 +583,14 @@ function_parser	* namespace_t::CreateFunctionFromTemplate(function_parser * func
             switch (source.lexem)
             {
             case lt_comma:
-                fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
-                instance_types.insert(std::make_pair(arg_ptr->type->name, t));
+                fprintf(stderr, "Found template type - %s %s %s\n", (*arg_ptr)->type->name.c_str(), (*arg_ptr)->name.c_str(), t->name.c_str());
+                instance_types.insert(std::make_pair((*arg_ptr)->type->name, t));
                 ++arg_ptr;
                 state = check_type;
                 continue;
             case lt_more:
-                fprintf(stderr, "Found template type - %s %s %s\n", arg_ptr->type->name.c_str(), arg_ptr->name.c_str(), t->name.c_str());
-                instance_types.insert(std::make_pair(arg_ptr->type->name, t));
+                fprintf(stderr, "Found template type - %s %s %s\n", (*arg_ptr)->type->name.c_str(), (*arg_ptr)->name.c_str(), t->name.c_str());
+                instance_types.insert(std::make_pair((*arg_ptr)->type->name, t));
                 ++arg_ptr;
                 state = create_instance;
                 continue;

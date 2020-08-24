@@ -16,6 +16,59 @@ class CodeSplitter : public Code
 	statement_stack_t			statement_stack;
 	std::stack<lexem_type_t>	mode_stack;
 
+    void DoEscapeSequence(lexem_node_t	* lex)
+    {
+        char * s = (char*) lex->value;
+        int source = 0;
+        int dest = 0;
+        for (bool esq = false; s[source]; source++)
+        {
+            char ch = s[source];
+            if (!esq)
+            {
+                if (ch != '\\')
+                {
+                    s[dest++] = ch;
+                    continue;
+                }
+                esq = true;
+                continue;
+            }
+            esq = false;
+            switch (ch)
+            {
+            case 'n':
+                ch = '\n';
+                break;
+            case 'r':
+                ch = '\r';
+                break;
+            case 't':
+                ch = '\t';
+                break;
+            case 'b':
+                ch = '\b';
+                break;
+            case 'a':
+                ch = '\a';
+                break;
+            case '\\':
+                ch = '\\';
+                break;
+            case '\'':
+                ch = '\'';
+                break;
+            case '\"':
+                ch = '\"';
+                break;
+            default:
+                throw "Not recognized escape sequence";
+            }
+            s[dest++] = ch;
+        }
+        s[dest] = '\0';
+    }
+
 	void FixThree(statement_list_t * list)
 	{
 		statement_list_t::iterator	statement_src = list->begin();
@@ -189,7 +242,12 @@ public:
 			lexem_list.clear();
 			break;
 
-		default:
+        case lt_string:
+            DoEscapeSequence(&lex);
+            current_node->push_back(lex);
+            break;
+
+        default:
 			current_node->push_back(lex);
 		}
 		else switch (ev->lexem_type)

@@ -62,8 +62,7 @@ type_t * namespace_t::ParseIndex(SourcePtr & source, type_t * type)
 #endif
 		if (size_expr != nullptr && size_expr->is_constant)
 		{
-			constant_node_t	* constant = (constant_node_t *)size_expr->root->constant;
-			type = new array_t(type, constant->integer_value);
+			type = new array_t(type, size_expr->root->value.integer_value);
 		}
 		else
 		{

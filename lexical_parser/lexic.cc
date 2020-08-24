@@ -50,6 +50,12 @@ static char * generate_typename(lexem_type_t type);
 lexem_type_t translate_builtin_types();
 void append_lexem(lexem_type_t type);
 
+static char GetCommand(char ch)
+{
+    // Do not touch eaq sequences here
+    return ch;
+}
+
 int parse_input(flow_control_t	*	flow)
 {
     int error_code;
@@ -70,13 +76,15 @@ int parse_input(flow_control_t	*	flow)
         if (marker && !isascii(ch))
             continue;
         marker = false;
+#if __DEBUG
         if (ch == 0xa)
         {
-            if (flow->line_number == 2867)
+            if (flow->line_number == 5)
                 printf("Debug here\n");
             if (flow->line_number == 2909)
                 printf("Debug here\n");
         }
+#endif
         try
         {
             error_code = global_state_machine(ch, flow);
@@ -105,8 +113,10 @@ extern bool IsInativeCode();
 static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
 {
 	st_line_number = flow->line_number;
-	//if(flow->line_number == 636 && strstr(flow->filename, "stdlib.h") )
-	//printf("line_number == \n");
+
+	//if(flow->line_number == 5 ) // && strstr(flow->filename, "stdlib.h") )
+	//    printf("line_number == %d\n", flow->line_number);
+
 	switch (flow->global_state) 
     {
 	case gs_expression:
@@ -424,7 +434,8 @@ static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
 	case gs_string:
 		if (ch != '"') 
         {
-			if (ch == '\\') flow->global_state = gs_screening;
+            if (ch == '\\')
+                flow->global_state = gs_screening;
 			current_lexem[current_lexem_size++] = ch;
 			return 0;
 		}
@@ -439,7 +450,7 @@ static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
 		return 0;
 
 	case gs_screening:
-		current_lexem[current_lexem_size++] = ch;
+		current_lexem[current_lexem_size++] = GetCommand(ch);
 		flow->global_state = gs_string;
 		return 0;
 
@@ -659,7 +670,6 @@ static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
 			return 0;
 		}
 #endif
-		flow->global_state = gs_lexem;
 		current_lexem[current_lexem_size++] = 0;
 		U_counter = L_counter = 0;
 
@@ -676,7 +686,13 @@ static int global_state_machine(unsigned char ch, flow_control_t	*	flow)
             break;
 		}
 	}
-	goto reparse;
+    if (toupper(ch) == 'F')
+    {
+        flow->global_state = gs_delimiter;
+        return 0;
+    }
+    flow->global_state = gs_lexem;
+    goto reparse;
 
 	case gs_parse_slash:
 		switch (ch)

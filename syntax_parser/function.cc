@@ -10,6 +10,10 @@ void function_overload_t::Parse(int line_num, namespace_t * parent, Code::statem
 	this->space = new namespace_t(parent, namespace_t::function_space, function->name + this->mangle);
 	this->space->owner_function = this;
 
+    // Set space for arguments
+    for (auto arg : this->arguments)
+        arg->space = this->space;
+
 	if (!parent->no_parse_methods_body)
 		this->space->Parse(*source);
 	else
@@ -112,10 +116,10 @@ variable_base_t * function_overload_t::FindArgument(std::string name)
     arg_list_t::iterator    arg;
     for (arg = arguments.begin(); arg != arguments.end(); ++arg)
     {
-        if (arg->name == name)
+        if ((*arg)->name == name)
         {
-            var = new farg_t(*arg);
-            var->name = name;
+            var = (*arg);
+//            printf("Find argument: %s %p\n", name.c_str(), var);
             break;
         }
     }
@@ -140,7 +144,7 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 	{
 		if (arg == args.end())
 		{
-			if (arg_proto == arguments.end() || arg_proto->type == nullptr || arg_proto->default_value != nullptr )
+			if (arg_proto == arguments.end() || (*arg_proto)->type == nullptr || (*arg_proto)->default_value != nullptr )
 				break; // No more arguments to function
 		}
 		else
@@ -161,9 +165,9 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 			return nullptr;
 		}
 
-		if (arg_proto->type != nullptr)
+		if ((*arg_proto)->type != nullptr)
 		{
-			if (arg_proto->type != expr->type)
+			if ((*arg_proto)->type != expr->type)
 			{
 				space->CreateError(arg_ptr.line_number, -7777722, "function '%s' argument type mismatch", mangled_name.c_str());
 				return nullptr;
@@ -172,17 +176,18 @@ statement_t * function_overload_parser::CallParser(Code::lexem_list_t args_seque
 		}
 
 		arg++;
-		if (arg_proto->type != 0) // Ёмул€ци€ многоточи€
-			arg_proto++;
+		if ((*arg_proto)->type != 0) // Ёмул€ци€ многоточи€
+			(*arg_proto)++;
+
 	}
 
 	while (arg_proto != arguments.end())
-		if (arg_proto->type == nullptr)
+		if ((*arg_proto)->type == nullptr)
 			break;
 		else
 		{
 			// add default argument
-			arg_proto++;
+			(*arg_proto)++;
 		}
 
 	return result;
@@ -221,7 +226,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
             case lt_three_dots:
             {
                 argument = new farg_t(this->space, nullptr, "...");
-                arguments.push_back(*argument);
+                arguments.push_back(argument);
                 state = got_three_dots;
                 status = 1;
                 continue;
@@ -293,7 +298,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			if (node.lexem == lt_comma)
 			{
 				argument = new farg_t(this->space, type, ""); // space->CreateVariable(type, name); // Create argument here
-				arguments.push_back(*argument);
+				arguments.push_back(argument);
 				const_arg = false;
 				state = wait_type;
 				continue;
@@ -336,7 +341,7 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			}
 
 			argument = new farg_t(this->space, type, name); // space->CreateVariable(type, name); // Create argument here
-			arguments.push_back(*argument);
+			arguments.push_back(argument);
             const_arg = false;
 			state = wait_type;
 			break;
@@ -360,14 +365,20 @@ void function_overload_parser::ParseArgunentDefinition(namespace_t * parent_spac
 			{
 			case wait_delimiter:
 				argument = new farg_t(this->space, type, name);
-				arguments.push_back(*argument);
-				break;
+#if ! COMPILER
+                argument->value.offset = arguments.size() * 4;
+#endif
+                arguments.push_back(argument);
+                break;
 			case wait_name:
 				argument = new farg_t(this->space, type, "");
-				arguments.push_back(*argument);
-				break;
+#if ! COMPILER
+                argument->value.offset = arguments.size() * 4;
+#endif
+                arguments.push_back(argument);
+                break;
 			}
-		}
+        }
 		else
 		{
 			if (arguments.size() != 0)
@@ -422,9 +433,9 @@ void function_overload_parser::MangleArguments()
         arg_list_t::iterator arg;
         for (arg = arguments.begin(); arg != arguments.end(); ++arg)
         {
-            if (arg->type != nullptr)
+            if ( (*arg)->type != nullptr)
             {
-                MangleType(arg->type, mangle);
+                MangleType( (*arg)->type, mangle);
                 if (&(*arg) != &arguments.back())
                     mangle += ",";
             }
@@ -481,11 +492,18 @@ void function_parser::FindBestFunctionOverload(call_t * call)
     {
         call->code = *function;
 
+        if ((*function)->arguments.size() == 0)
+        {
+            if (call->arguments.size() != 0)
+                continue;
+            break; 
+        }
+
         arg_list_t::iterator		arg_proto = (*function)->arguments.begin();
         std::list<expression_t *>::iterator arg;
         for (arg = call->arguments.begin(); arg != call->arguments.end(); ++arg)
         {
-            const type_t * proto = arg_proto->type;
+            const type_t * proto = (*arg_proto)->type;
             const type_t *  type = (*arg)->type;
             if (proto == nullptr)
             {
@@ -535,6 +553,7 @@ call_t * function_parser::TryCallFunction(namespace_t * space, SourcePtr & arg_l
 		expression_t * arg = space->ParseExpression(arg_list);
 		if (arg == nullptr)
 			break;
+        call->argument_frame_size += arg->type->bitsize >> 3;
 		call->arguments.push_back(arg);
 
 		switch (arg_list.lexem)

@@ -70,6 +70,14 @@ struct linkage_t
     }
 };
 
+typedef enum 
+{
+    vs_global,
+    vs_static,
+    vs_argument,
+    vs_local
+} variable_segment_t;
+
 class pointer_t : public type_t
 {
 	virtual lexem_type_t GetType() { return lt_pointer; }
@@ -185,10 +193,17 @@ typedef struct static_data
 		std::list<struct static_data*>	*	nested;
 	};
 
-	static_data(int v) : type(lt_integer) { s_int = v; }
+    static_data(int v) : type(lt_integer) { s_int = v; }
 	static_data(char * v) : type(lt_string) { p_char = v; }
 	static_data(const char * v) : type(lt_string) { p_char = (char*)v; }
-	static_data(lexem_type_t t) : type(t)
+
+    static_data()
+    {
+        type = lt_empty;
+        s_int = 0;
+    }
+
+    static_data(lexem_type_t t) : type(t)
 	{
 		p_char = nullptr;
 		nested = new std::list<struct static_data*>();

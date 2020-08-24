@@ -11,19 +11,20 @@ public:
 		namespace_t		*	space,
 		type_t			*	type,
 		std::string			name) 
-			: variable_base_t(space, type, name, linkage_t::sc_argument)
+			: variable_base_t(space, type, name, vs_argument)
 	{
+//        printf("Create argument: %s %p\n", name.c_str(), this);
 		default_value = nullptr;
 	}
 };
 
-typedef std::list<farg_t>	arg_list_t;
+typedef std::list<farg_t*>	arg_list_t;
 
 struct function_overload_t
 {
     int                         access_count;
 	std::string					mangle;		// Without parent name
-	class function_parser		*	function;
+	class function_parser	*	function;
 	arg_list_t					arguments;
 	class namespace_t		*	space;
 	linkage_t					linkage;

@@ -1,5 +1,5 @@
 all: helloworld.c
-       echo "Rargetd all: ${0}"
+       echo "Target all: ${0}"
        
 check: helloworld.c
         echo "Tests under construction"

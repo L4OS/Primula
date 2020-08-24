@@ -17,13 +17,23 @@
 #include "errors.h"
 #include "primula.h"
 
+#if ! COMPILER
+
+typedef union {
+    int             i32;
+    const char  *   p8;
+    float           f32;
+} common_value_t;
+
+#endif
+
 class namespace_t : public space_t
 {
 protected:
     static bool     config_translate_ternary;
 public:
 
-    Errors                                          errors;
+    static Errors                                   errors;
     function_overload_t                         *   owner_function;
     visibility_t                                    current_visibility;
     std::map<std::string, type_t*>                  space_types_map;
@@ -40,6 +50,10 @@ public:
     static type_t  builtin_types[18];
     bool no_parse_methods_body; // = false; // An old g++ does not allow such initialization
     std::map<std::string, type_t*>	instance_types;
+
+#if ! COMPILER
+    int             non_static_variable_pool_size;
+#endif
 
 public:
 	namespace_t()
@@ -63,6 +77,8 @@ public:
 	namespace_t * Parent() { return parent; }
 
 	static type_t	*	GetBuiltinType(lexem_type_t type);
+    void RegisterBuiltinTypes();
+
 	type_t	*	TryLexenForType(SourcePtr & source);
 
     void ParseUsing(SourcePtr &source);
@@ -80,7 +96,7 @@ public:
 	function_parser     *   FindTemplateFunction(std::string name);
 	type_t              *   FindType(std::string name);
 	
-	variable_base_t		* CreateVariable(type_t * type, std::string name, linkage_t	* linkage);
+	variable_base_t		* CreateVariable(type_t * type, std::string name, variable_segment_t segment);
 	function_overload_t	* CreateFunction(type_t *type, std::string name, Code::lexem_list_t * sequence, linkage_t	* linkage);
 	type_t				* CreateType(type_t * type, std::string name);
 	function_overload_t	* CreateOperator(type_t *type, std::string name, Code::lexem_list_t * sequence, linkage_t	* linkage);
@@ -92,6 +108,11 @@ public:
     static_data_t   * BraceEncodedStructureInitialization(structure_t * structure, Code::statement_list_t * encoded_data);
     static_data_t   * CheckLexemeData(type_t * type, Code::lexem_node_t * node);
     static_data_t   * TryEnumsAndConstants(type_t * type, Code::lexem_node_t * node);
+    // Copy structure data to raw memory
+    unsigned int    * PackDefinitionToMemory(type_t * type, SourcePtr & source, unsigned int * data_ptr);
+    unsigned int    * PackStructureInMemory(structure_t * structure, Code::statement_list_t * encoded_data, unsigned int * data_ptr);
+    unsigned int    * PackLexemeData(type_t * type, Code::lexem_node_t * node, unsigned int * data_ptr);
+    unsigned int    * PackEnumsAndConstants(type_t * type, Code::lexem_node_t * node, unsigned int * data_ptr);
 
 	namespace_t * findBreakableSpace(bool continues);
 	namespace_t * findContinuableSpace();
@@ -142,6 +163,7 @@ private:
 	type_t * ParseIndex(SourcePtr & source, type_t * type);
 	//inline template_t * namespace_t::CreateTemplateType(std::string type_name);
     void TranslateTernaryOperation(expression_t  *  code);
+    variable_segment_t FindSegmentType(linkage_t * linkage);
 
 //	friend class function_overload_parser;
 	friend struct function_overload_t;
@@ -153,7 +175,10 @@ private:
 		this->name = name;
 		owner_function = parent->owner_function;
         no_parse_methods_body = false;
-	}
+#if ! COMPILER
+        non_static_variable_pool_size = 0;
+#endif
+    }
 
 public:
 };

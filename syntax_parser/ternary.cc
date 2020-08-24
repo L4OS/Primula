@@ -44,7 +44,7 @@ void namespace_t::TranslateTernaryOperation(expression_t  *  code)
 
         variable_base_t     *   tern_var = this->FindVariableInspace("ternary");
         if(tern_var == nullptr)
-            tern_var = this->CreateVariable(ternary->type, "ternary", &linkage);
+            tern_var = this->CreateVariable(ternary->type, "ternary", FindSegmentType(&linkage));
 
         expression_node_t   *   condition = ternary->left;
         expression_node_t   *   true_side = ternary->right->left;

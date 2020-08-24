@@ -59,7 +59,7 @@ statement_t * namespace_t::CheckOperator_RETURN(SourcePtr &source)
 				expression_node_t * en = expression->root;
 				if (en->is_constant && en->lexem == lt_integer)
 				{
-					constant_node_t * con = en->constant;
+					reg_t * con = &en->value;
 					zero_rval = con->integer_value == 0;
 				}
 			}
@@ -155,7 +155,8 @@ statement_t * namespace_t::CheckOperator_THROW(SourcePtr &source)
         {
         case lt_string:
         {
-            result->exception_constant = new constant_node_t(root->constant->char_pointer);
+            result->exception_constant = new reg_t;
+            result->exception_constant->char_pointer = (root->value.char_pointer);
             break;
         }
         default:
@@ -204,9 +205,9 @@ statement_t * namespace_t::CheckOperator_TRY(SourcePtr &source)
 			continue;
 		}
 
-		farg_t  arg = result->handler->arguments.front();
-		result->type = arg.type;
-		result->exception = arg.name;
+		farg_t * arg = result->handler->arguments.front();
+		result->type = arg->type;
+		result->exception = arg->name;
 		source++;
 		if (source == false || source.lexem != lt_openblock)
 		{
@@ -573,9 +574,13 @@ statement_t * namespace_t::CheckOperator_CASE(SourcePtr &source)
         if (source.lexem == lt_word)
         {
             en = TryEnumeration(source.value, false);
+#if COMPILER
             if (en->static_data->type != lt_integer)
                 throw "namespace_t::CheckOperator_CASE - enumeration must be integer type";
             case_value = en->static_data->s_int;
+#else
+            case_value = en->value.integer_value;
+#endif
         }
         if (en == nullptr)
         {

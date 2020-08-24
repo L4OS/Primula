@@ -9,7 +9,7 @@ SOURCES = \
 TARGET = syntax_parser
 
 all: ${SOURCES}
-	g++ ${SOURCES} -o ${TARGET}
+	g++ -DCOMPILER ${SOURCES} -o ${TARGET}
 
 clean:
 	rm *.o ${TARGET}

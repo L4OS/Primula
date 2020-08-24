@@ -240,16 +240,16 @@ void GenerateItem(expression_node_t * n, int parent_priority = 1000)
         str = "->";
         break;
     case lt_integer:
-        Write("%d", n->constant->integer_value);
+        Write("%d", n->value.integer_value);
         break;
     case lt_floatnumber:
-        Write("%f", n->constant->float_value);
+        Write("%f", n->value.float_value);
         break;
     case lt_string:
-        Write("\"%s\"", n->constant->char_pointer);
+        Write("\"%s\"", n->value.char_pointer);
         break;
     case lt_character:
-        PrintCharacter(n->constant->integer_value);
+        PrintCharacter(n->value.integer_value);
         break;
     case lt_equally:
         str = " == ";
@@ -663,9 +663,9 @@ void restore_source_t::GenerateFunctionOverload(function_overload_t * overload, 
         arg != overload->arguments.end();
         ++arg)
     {
-        if (arg->type != nullptr)
+        if ((*arg)->type != nullptr)
         {
-            GenerateTypeName(arg->type, (char*)arg->name.c_str());
+            GenerateTypeName((*arg)->type, (char*)(*arg)->name.c_str());
             if (&(*arg) != &overload->arguments.back())
                 Write(", ");
         }
@@ -769,7 +769,7 @@ void restore_source_t::GenerateType(type_t * type, bool inlined_only)
                 arg != (*func)->arguments.end();
                 ++arg)
             {
-                GenerateTypeName(arg->type, arg->name.c_str());
+                GenerateTypeName((*arg)->type, (*arg)->name.c_str());
                 if (arg != (*func)->arguments.begin())
                     Write(", ");
             }
